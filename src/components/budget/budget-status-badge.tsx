@@ -1,0 +1,32 @@
+import { cn } from "@/lib/utils";
+import { budgetStatusLabel, budgetStatusTone } from "@/lib/budget/calculations";
+import type { BudgetStatus } from "@/lib/budget/types";
+
+const toneClasses: Record<ReturnType<typeof budgetStatusTone>, string> = {
+  default:
+    "border-emerald-200/80 bg-emerald-50 text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300",
+  caution:
+    "border-amber-200/80 bg-amber-50 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200",
+  attention:
+    "border-sky-200/80 bg-sky-50 text-sky-900 dark:border-sky-900/50 dark:bg-sky-950/40 dark:text-sky-200",
+};
+
+interface BudgetStatusBadgeProps {
+  status: BudgetStatus;
+  className?: string;
+}
+
+export function BudgetStatusBadge({ status, className }: BudgetStatusBadgeProps) {
+  const tone = budgetStatusTone(status);
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium",
+        toneClasses[tone],
+        className
+      )}
+    >
+      {budgetStatusLabel(status)}
+    </span>
+  );
+}

@@ -1,0 +1,75 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --radius: 0.75rem;
+  --background: #f8faf9;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --muted: #f1f5f4;
+  --muted-foreground: #64748b;
+  --border: #e2e8e6;
+  --primary: #0d4f4a;
+  --primary-foreground: #f0fdfa;
+  --accent: #ecfdf5;
+  --accent-foreground: #0d4f4a;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #334155;
+  --sidebar-border: #e2e8e6;
+  --sidebar-accent: #f0fdfa;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0c1210;
+    --foreground: #f1f5f4;
+    --card: #141c19;
+    --card-foreground: #f1f5f4;
+    --muted: #1a2420;
+    --muted-foreground: #94a3b8;
+    --border: #243029;
+    --primary: #2dd4bf;
+    --primary-foreground: #042f2e;
+    --accent: #134e4a;
+    --accent-foreground: #ccfbf1;
+    --sidebar: #101816;
+    --sidebar-foreground: #cbd5e1;
+    --sidebar-border: #243029;
+    --sidebar-accent: #134e4a;
+  }
+}
+
+* {
+  border-color: var(--border);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
