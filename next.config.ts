@@ -12,7 +12,13 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "10mb",
     },
   },
-  serverExternalPackages: ["pdf-parse"],
+  outputFileTracingIncludes: {
+    "/transactions/import": [
+      "./node_modules/pdf-parse/dist/worker/**/*",
+      "./node_modules/@napi-rs/canvas/**/*",
+    ],
+  },
+  serverExternalPackages: ["pdf-parse", "@napi-rs/canvas"],
 };
 
 export default nextConfig;

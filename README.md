@@ -18,11 +18,17 @@ cp .env.example .env.local
 
 2. Add your [Supabase](https://supabase.com) project URL and anon key to `.env.local`.
 
-3. In Supabase Dashboard → Authentication → URL Configuration, set:
-   - Site URL: `http://localhost:3000`
-   - Redirect URLs: `http://localhost:3000/auth/callback`
+3. In Supabase Dashboard → **Authentication → URL Configuration**:
+   - **Site URL**: your primary app URL (local: `http://localhost:3000`, production: your deployed URL)
+   - **Redirect URLs** (add every environment you use):
+     - `http://localhost:3000/auth/callback`
+     - `https://your-production-domain.com/auth/callback`
 
-4. Install and run:
+   If confirmation emails still open `localhost` while you use a deployed app, the Supabase **Site URL** is probably still set to localhost — update it and add your production callback URL above.
+
+4. Optional: set `NEXT_PUBLIC_APP_URL` in `.env.local` (and in your host’s env vars) to the exact URL users should return to after email confirmation, e.g. `https://your-production-domain.com`. Signup uses this instead of whatever origin the browser had when you registered.
+
+5. Install and run:
 
 ```bash
 npm install

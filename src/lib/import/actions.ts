@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAuth } from "@/lib/auth/helpers";
+import { getUser } from "@/lib/auth/helpers";
 import {
   filterRowsForImport,
   markImportPreviewRows,
@@ -32,7 +32,10 @@ export interface ParseImportPreviewResult extends ParseImportFileResult {
 export async function parseImportPreview(
   formData: FormData
 ): Promise<ActionResult<ParseImportPreviewResult>> {
-  const user = await requireAuth();
+  const user = await getUser();
+  if (!user) {
+    return { success: false, error: "Please sign in again to import statements." };
+  }
 
   const accountId = String(formData.get("account_id") ?? "");
   const file = formData.get("file");
@@ -107,6 +110,7 @@ export async function parseImportPreview(
       },
     };
   } catch (err) {
+    console.error("[parseImportPreview]", err);
     return {
       success: false,
       error: err instanceof Error ? err.message : "Failed to parse file.",
@@ -117,7 +121,10 @@ export async function parseImportPreview(
 export async function importTransactions(
   input: ImportTransactionsInput
 ): Promise<ActionResult<ImportTransactionsResult>> {
-  const user = await requireAuth();
+  const user = await getUser();
+  if (!user) {
+    return { success: false, error: "Please sign in again to import statements." };
+  }
 
   if (!input.account_id) {
     return { success: false, error: "Account is required." };

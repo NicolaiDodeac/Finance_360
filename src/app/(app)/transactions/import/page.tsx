@@ -7,6 +7,7 @@ import { requireAuth } from "@/lib/auth/helpers";
 import { getAccounts } from "@/lib/accounts/queries";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 export default async function ImportTransactionsPage() {
   const user = await requireAuth();
