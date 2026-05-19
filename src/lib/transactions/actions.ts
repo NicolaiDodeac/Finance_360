@@ -7,6 +7,7 @@ import {
   mergeRawImportCategorization,
 } from "@/lib/categorization/apply";
 import { incrementRulesTimesMatched } from "@/lib/categorization/increment";
+import { applyRetroactiveCategorization } from "@/lib/categorization/retroactive-apply";
 import { getCategorizationRules } from "@/lib/categorization/queries";
 import { requireAuth } from "@/lib/auth/helpers";
 import { createClient } from "@/lib/supabase/server";
@@ -161,7 +162,7 @@ export async function createTransaction(
 export async function updateTransaction(
   transactionId: string,
   raw: TransactionFormInput
-): Promise<ActionResult> {
+): Promise<ActionResult<{ similarUpdatedCount: number }>> {
   const user = await requireAuth();
   const { input: parsed, error: validationError } = parseFormInput(raw);
 
@@ -173,7 +174,7 @@ export async function updateTransaction(
   const { data: existing, error: fetchError } = await supabase
     .from("transactions")
     .select(
-      "description, merchant_name, raw_import_data"
+      "description, merchant_name, direction, category_id, hmrc_category_id, is_business, raw_import_data"
     )
     .eq("id", transactionId)
     .eq("user_id", user.id)
@@ -246,6 +247,42 @@ export async function updateTransaction(
     await incrementRulesTimesMatched(user.id, [matchedRuleId]);
   }
 
+  const categorizationBefore = {
+    category_id: existing.category_id,
+    hmrc_category_id: existing.hmrc_category_id,
+    is_business: existing.is_business,
+  };
+  const categorizationAfter = {
+    category_id: categorizedInput.category_id || null,
+    hmrc_category_id: categorizedInput.hmrc_category_id || null,
+    is_business: categorizedInput.is_business,
+  };
+
+  const transactionLabel =
+    categorizedInput.description.trim() ||
+    categorizedInput.merchant_name.trim() ||
+    "transaction";
+
+  const retroactive = await applyRetroactiveCategorization(
+    user.id,
+    transactionId,
+    {
+      description: categorizedInput.description.trim() || null,
+      merchant_name: categorizedInput.merchant_name.trim() || null,
+      direction: categorizedInput.direction,
+    },
+    categorizationBefore,
+    categorizationAfter,
+    categorizedInput,
+    transactionLabel
+  );
+
   revalidatePath("/transactions");
-  return { success: true };
+  revalidatePath("/dashboard");
+  revalidatePath("/settings/rules");
+
+  return {
+    success: true,
+    data: { similarUpdatedCount: retroactive.updatedCount },
+  };
 }

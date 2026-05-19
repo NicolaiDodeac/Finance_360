@@ -22,6 +22,15 @@ export {
 
 export { findMatchingRule, ruleMatchesTransaction } from "@/lib/categorization/match";
 
+export {
+  categorizationChanged,
+  filterRetroactiveTargets,
+  inferMatchKeyword,
+  transactionMatchesAnchor,
+} from "@/lib/categorization/retroactive";
+
+export { applyRetroactiveCategorization } from "@/lib/categorization/retroactive-apply";
+
 export { getCategorizationRules, getCategorizationRuleById } from "@/lib/categorization/queries";
 
 export {

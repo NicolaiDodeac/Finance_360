@@ -29,6 +29,7 @@ import { TransactionReceiptSection } from "@/components/transactions/transaction
 interface TransactionEditDrawerProps {
   transaction: TransactionWithRelations | null;
   onClose: () => void;
+  onSaved?: (info: { similarUpdatedCount: number }) => void;
   accounts: AccountRow[];
   categories: CategoryRow[];
   hmrcCategories: HmrcCategoryRow[];
@@ -38,6 +39,7 @@ interface TransactionEditDrawerProps {
 export function TransactionEditDrawer({
   transaction,
   onClose,
+  onSaved,
   accounts,
   categories,
   hmrcCategories,
@@ -71,6 +73,8 @@ export function TransactionEditDrawer({
         setError(result.error ?? "Could not update transaction.");
         return;
       }
+      const similarCount = result.data?.similarUpdatedCount ?? 0;
+      onSaved?.({ similarUpdatedCount: similarCount });
       onClose();
       router.refresh();
     });
@@ -112,7 +116,8 @@ export function TransactionEditDrawer({
 
               <div className="mt-6 border-t border-border pt-4">
                 <p className="mb-3 text-sm text-muted-foreground">
-                  Apply this automatically next time
+                  Similar past and future transactions are matched automatically
+                  when you save a category. Adjust the rule here if needed.
                 </p>
                 <CreateRuleFromTransaction
                   form={activeForm}
