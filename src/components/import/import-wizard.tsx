@@ -46,13 +46,21 @@ export function ImportWizard({ accounts, defaultAccountId }: ImportWizardProps) 
     formData.set("file", file);
 
     startParse(async () => {
-      const result = await parseImportPreview(formData);
-      if (!result.success || !result.data) {
-        setError(result.error ?? "Failed to parse file.");
-        return;
+      try {
+        const result = await parseImportPreview(formData);
+        if (!result.success || !result.data) {
+          setError(result.error ?? "Failed to parse file.");
+          return;
+        }
+        setParseResult(result.data);
+        setStep("preview");
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Could not parse the file. Try again or use a smaller statement."
+        );
       }
-      setParseResult(result.data);
-      setStep("preview");
     });
   };
 
@@ -65,32 +73,38 @@ export function ImportWizard({ accounts, defaultAccountId }: ImportWizardProps) 
     );
 
     startImport(async () => {
-      const result = await importTransactions({
-        account_id: parseResult.account_id,
-        adapter_id: parseResult.adapterId,
-        file_name: parseResult.fileName,
-        rows: rowsToImport.map((row) => ({
-          import_key: row.import_key,
-          date: row.date,
-          description: row.description,
-          merchant_name: row.merchant_name,
-          amount: row.amount,
-          direction: row.direction,
-          balance: row.balance,
-          raw_import_data: row.raw_import_data,
-          category_id: row.category_id,
-          hmrc_category_id: row.hmrc_category_id,
-          is_business: row.is_business,
-        })),
-      });
+      try {
+        const result = await importTransactions({
+          account_id: parseResult.account_id,
+          adapter_id: parseResult.adapterId,
+          file_name: parseResult.fileName,
+          rows: rowsToImport.map((row) => ({
+            import_key: row.import_key,
+            date: row.date,
+            description: row.description,
+            merchant_name: row.merchant_name,
+            amount: row.amount,
+            direction: row.direction,
+            balance: row.balance,
+            raw_import_data: row.raw_import_data,
+            category_id: row.category_id,
+            hmrc_category_id: row.hmrc_category_id,
+            is_business: row.is_business,
+          })),
+        });
 
-      if (!result.success || !result.data) {
-        setError(result.error ?? "Import failed.");
-        return;
+        if (!result.success || !result.data) {
+          setError(result.error ?? "Import failed.");
+          return;
+        }
+
+        setImportResult(result.data);
+        setStep("done");
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Import failed. Please try again."
+        );
       }
-
-      setImportResult(result.data);
-      setStep("done");
     });
   };
 

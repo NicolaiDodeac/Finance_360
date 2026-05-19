@@ -6,6 +6,13 @@ import {
   DEFAULT_CATEGORY_PARENTS,
 } from "@/lib/setup/defaults";
 
+function isDuplicateKeyError(error: { code?: string; message?: string }): boolean {
+  return (
+    error.code === "23505" ||
+    (error.message?.includes("duplicate key") ?? false)
+  );
+}
+
 async function getExistingSlugs(
   userId: string,
   supabase: ServerSupabaseClient
@@ -22,33 +29,60 @@ async function getExistingSlugs(
   return new Set((data ?? []).map((row) => row.slug));
 }
 
+async function insertCategoriesIgnoringDuplicates(
+  rows: {
+    user_id: string;
+    name: string;
+    slug: string;
+    parent_id: string | null;
+    sort_order: number;
+  }[],
+  supabase: ServerSupabaseClient
+): Promise<void> {
+  if (rows.length === 0) return;
+
+  const { error } = await supabase.from("categories").insert(rows);
+
+  if (!error) return;
+
+  if (!isDuplicateKeyError(error)) {
+    throw new Error(error.message);
+  }
+
+  for (const row of rows) {
+    const { error: rowError } = await supabase.from("categories").insert(row);
+    if (rowError && !isDuplicateKeyError(rowError)) {
+      throw new Error(rowError.message);
+    }
+  }
+}
+
 /** Ensures default parent/child categories exist. Safe to call repeatedly. */
 export async function ensureDefaultCategories(
   userId: string,
   supabase?: ServerSupabaseClient
 ): Promise<CategoryRow[]> {
   const client = supabase ?? (await createClient());
-  const existingSlugs = await getExistingSlugs(userId, client);
+  let existingSlugs = await getExistingSlugs(userId, client);
 
   const parentsToInsert = DEFAULT_CATEGORY_PARENTS.filter(
     (parent) => !existingSlugs.has(parent.slug)
   );
 
   if (parentsToInsert.length > 0) {
-    const { error } = await client.from("categories").insert(
+    await insertCategoriesIgnoringDuplicates(
       parentsToInsert.map((parent) => ({
         user_id: userId,
         name: parent.name,
         slug: parent.slug,
         parent_id: null,
         sort_order: parent.sort_order,
-      }))
+      })),
+      client
     );
-
-    if (error) {
-      throw new Error(error.message);
-    }
   }
+
+  existingSlugs = await getExistingSlugs(userId, client);
 
   const { data: parents, error: parentsError } = await client
     .from("categories")
@@ -86,11 +120,7 @@ export async function ensureDefaultCategories(
   });
 
   if (childrenToInsert.length > 0) {
-    const { error } = await client.from("categories").insert(childrenToInsert);
-
-    if (error) {
-      throw new Error(error.message);
-    }
+    await insertCategoriesIgnoringDuplicates(childrenToInsert, client);
   }
 
   const { data, error } = await client
