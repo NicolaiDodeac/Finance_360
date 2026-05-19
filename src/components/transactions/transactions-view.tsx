@@ -44,6 +44,7 @@ export function TransactionsView({
   const searchParams = useSearchParams();
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<TransactionWithRelations | null>(null);
+  const [saveNotice, setSaveNotice] = useState<string | null>(null);
 
   const defaultAccountId = accounts[0]?.id ?? "";
 
@@ -89,6 +90,12 @@ export function TransactionsView({
         </p>
       )}
 
+      {saveNotice ? (
+        <p className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-200">
+          {saveNotice}
+        </p>
+      ) : null}
+
       <div className="mb-6">
         <TransactionFilters categories={categories} taxYears={taxYears} />
       </div>
@@ -123,6 +130,15 @@ export function TransactionsView({
       <TransactionEditDrawer
         transaction={editing}
         onClose={() => setEditing(null)}
+        onSaved={({ similarUpdatedCount }) => {
+          if (similarUpdatedCount > 0) {
+            setSaveNotice(
+              `Saved. Also updated ${similarUpdatedCount} similar transaction${similarUpdatedCount === 1 ? "" : "s"} with the same category.`
+            );
+          } else {
+            setSaveNotice(null);
+          }
+        }}
         accounts={accounts}
         categories={categories}
         hmrcCategories={hmrcCategories}
