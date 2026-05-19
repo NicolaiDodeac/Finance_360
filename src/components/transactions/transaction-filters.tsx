@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Search } from "lucide-react";
+import { Search, X } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -12,6 +13,11 @@ import {
   getSelectableCategories,
 } from "@/lib/categories/display";
 import type { TaxYearRow } from "@/lib/tax-years/queries";
+import {
+  formatDateRangeChipLabel,
+  parseIsoDateParam,
+} from "@/lib/transactions/date-range";
+import { UNCATEGORIZED_CATEGORY_FILTER } from "@/lib/transactions/links";
 import type { BusinessScopeFilter } from "@/lib/transactions/types";
 import type { TransactionDirection } from "@/types/database";
 
@@ -37,6 +43,8 @@ export function TransactionFilters({
   const scope = (searchParams.get("scope") ?? "all") as BusinessScopeFilter;
   const categoryId = searchParams.get("category") ?? "";
   const taxYearId = searchParams.get("taxYear") ?? "";
+  const from = parseIsoDateParam(searchParams.get("from") ?? undefined);
+  const to = parseIsoDateParam(searchParams.get("to") ?? undefined);
 
   const applyParams = useCallback(
     (updates: Record<string, string | null>) => {
@@ -85,6 +93,22 @@ export function TransactionFilters({
           </div>
         </FilterField>
 
+        {from && to ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="secondary" className="gap-1 pr-1">
+              <span>{formatDateRangeChipLabel(from, to)}</span>
+              <button
+                type="button"
+                onClick={() => applyParams({ from: null, to: null })}
+                className="rounded-sm p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                aria-label="Clear date range"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          </div>
+        ) : null}
+
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <FilterField label="Direction" id="tx-direction">
             <Select
@@ -128,6 +152,7 @@ export function TransactionFilters({
               }
             >
               <option value="">All categories</option>
+              <option value={UNCATEGORIZED_CATEGORY_FILTER}>Uncategorized</option>
               {getSelectableCategories(categories).map((category) => (
                 <option key={category.id} value={category.id}>
                   {getCategoryOptionLabel(category, categories)}

@@ -7,48 +7,14 @@ import { getCategories } from "@/lib/categories/queries";
 import { getHmrcCategories } from "@/lib/hmrc/queries";
 import { getUnmatchedReceipts } from "@/lib/receipts/queries";
 import { getTaxYears } from "@/lib/tax-years/queries";
+import {
+  parseTransactionSearchParams,
+  type TransactionSearchParams,
+} from "@/lib/transactions/filters";
 import { getTransactions } from "@/lib/transactions/queries";
-import type {
-  BusinessScopeFilter,
-  TransactionFilters,
-} from "@/lib/transactions/types";
-import type { TransactionDirection } from "@/types/database";
 
 interface TransactionsPageProps {
-  searchParams: Promise<{
-    q?: string;
-    direction?: string;
-    scope?: string;
-    category?: string;
-    taxYear?: string;
-    hmrc?: string;
-  }>;
-}
-
-function parseFilters(
-  params: Awaited<TransactionsPageProps["searchParams"]>
-): TransactionFilters {
-  const direction = params.direction;
-  const scope = params.scope;
-
-  return {
-    search: params.q,
-    direction:
-      direction === "income" ||
-      direction === "expense" ||
-      direction === "transfer"
-        ? (direction as TransactionDirection)
-        : "all",
-    scope:
-      scope === "business" || scope === "personal"
-        ? (scope as BusinessScopeFilter)
-        : "all",
-    categoryId: params.category,
-    taxYearId: params.taxYear,
-    hmrcCategoryIds: params.hmrc
-      ? params.hmrc.split(",").filter(Boolean)
-      : undefined,
-  };
+  searchParams: Promise<TransactionSearchParams>;
 }
 
 async function TransactionsContent({
@@ -57,7 +23,7 @@ async function TransactionsContent({
   searchParams: Awaited<TransactionsPageProps["searchParams"]>;
 }) {
   const user = await requireAuth();
-  const filters = parseFilters(searchParams);
+  const filters = parseTransactionSearchParams(searchParams);
 
   let loadError: string | null = null;
   let transactions: Awaited<ReturnType<typeof getTransactions>> = [];

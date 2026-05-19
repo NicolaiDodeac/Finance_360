@@ -3,6 +3,10 @@ export {
   createEmergencyFundPlan,
   createHouseDepositPlan,
   createTripPlan,
+  enrichBigPurchaseGoal,
+  enrichEmergencyFundGoal,
+  enrichHouseDepositGoal,
+  enrichTripGoal,
   updatePlanProgress,
 } from "@/lib/planning/actions";
 export {
@@ -17,7 +21,11 @@ export {
   planningStatusTone,
   suggestedMonthlyContribution,
 } from "@/lib/planning/calculations";
-export { getPlanningPlans, getPlanningPreview } from "@/lib/planning/queries";
+export {
+  getPlanningPlans,
+  getPlanningPreview,
+  getSimpleGoalsWithoutDetails,
+} from "@/lib/planning/queries";
 export type {
   PlanningPlan,
   PlanningStatus,

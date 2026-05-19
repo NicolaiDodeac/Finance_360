@@ -1,7 +1,7 @@
 import { PageHeader } from "@/components/shared/page-header";
 import { PlanningView } from "@/components/planning/planning-view";
 import { requireAuth } from "@/lib/auth/helpers";
-import { getPlanningPlans } from "@/lib/planning/queries";
+import { getPlanningPlans, getSimpleGoalsWithoutDetails } from "@/lib/planning/queries";
 import { getActiveSpaceContext } from "@/lib/spaces/queries";
 import { spaceSwitcherLabel } from "@/lib/spaces/types";
 
@@ -10,10 +10,14 @@ export default async function PlanningPage() {
   const { space, isShared } = await getActiveSpaceContext(user.id);
 
   let plans: Awaited<ReturnType<typeof getPlanningPlans>> = [];
+  let simpleGoals: Awaited<ReturnType<typeof getSimpleGoalsWithoutDetails>> = [];
   let loadError: string | null = null;
 
   try {
-    plans = await getPlanningPlans(space.id);
+    [plans, simpleGoals] = await Promise.all([
+      getPlanningPlans(space.id),
+      getSimpleGoalsWithoutDetails(space.id),
+    ]);
   } catch (err) {
     loadError =
       err instanceof Error ? err.message : "Failed to load your plans.";
@@ -38,6 +42,7 @@ export default async function PlanningPage() {
       ) : null}
       <PlanningView
         plans={plans}
+        simpleGoals={simpleGoals}
         spaceName={space.name}
         isShared={isShared}
         canManage={space.canManage}

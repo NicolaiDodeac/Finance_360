@@ -11,7 +11,6 @@ import { DashboardBudgetCard } from "@/components/dashboard/dashboard-budget-car
 import { DashboardPlanningPreview } from "@/components/dashboard/dashboard-planning-preview";
 import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
 import { SharedSpaceDashboard } from "@/components/dashboard/shared-space-dashboard";
-import { PlaceholderCard } from "@/components/shared/placeholder-card";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -21,14 +20,43 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getSelfAssessmentHref } from "@/lib/dashboard/calculations";
+import type { RecurringPayment } from "@/lib/dashboard/recurring";
 import type { DashboardData } from "@/lib/dashboard/types";
+import { goalMonthlyContributionLine } from "@/lib/goals/calculations";
 import { goalProgressPercent } from "@/lib/goals/types";
 import { financeModeLabel, showsBusinessFeatures } from "@/lib/profile/types";
-import { formatMoney } from "@/lib/transactions/format";
+import { formatMoney, formatShortDate } from "@/lib/transactions/format";
+import { buildPersonalSpendingCategoryLink } from "@/lib/transactions/links";
 
 interface DashboardViewProps {
   data: DashboardData;
   taxYearId: string | null;
+}
+
+function RecurringPaymentRow({
+  item,
+  currency,
+}: {
+  item: RecurringPayment;
+  currency: string;
+}) {
+  return (
+    <div className="space-y-1 text-sm">
+      <div className="flex items-start justify-between gap-2">
+        <span className="font-medium">{item.merchantLabel}</span>
+        <span className="shrink-0 tabular-nums text-muted-foreground">
+          {formatMoney(item.averageAmount, currency)}
+        </span>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        {item.frequencyLabel}
+        {item.nextExpectedDate
+          ? ` · Next around ${formatShortDate(item.nextExpectedDate)}`
+          : null}
+        {item.categoryName ? ` · ${item.categoryName}` : null}
+      </p>
+    </div>
+  );
 }
 
 function MetricCard({
@@ -154,7 +182,11 @@ export function DashboardView({ data, taxYearId }: DashboardViewProps) {
               </p>
             ) : (
               personal.spendingByCategory.slice(0, 6).map((row) => (
-                <div key={row.categoryId ?? row.categoryName} className="space-y-1">
+                <Link
+                  key={row.categoryId ?? row.categoryName}
+                  href={buildPersonalSpendingCategoryLink(row.categoryId)}
+                  className="block space-y-1 rounded-lg px-2 py-1.5 -mx-2 transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                >
                   <div className="flex justify-between text-sm">
                     <span>{row.categoryName}</span>
                     <span className="tabular-nums text-muted-foreground">
@@ -169,7 +201,7 @@ export function DashboardView({ data, taxYearId }: DashboardViewProps) {
                       }}
                     />
                   </div>
-                </div>
+                </Link>
               ))
             )}
           </CardContent>
@@ -242,7 +274,7 @@ export function DashboardView({ data, taxYearId }: DashboardViewProps) {
                       />
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      {progress}% · Suggested monthly contribution — coming soon
+                      {goalMonthlyContributionLine(goal, currency, formatMoney)}
                     </p>
                   </div>
                 );
@@ -256,11 +288,55 @@ export function DashboardView({ data, taxYearId }: DashboardViewProps) {
             </Button>
           </CardContent>
         </Card>
-        <PlaceholderCard
-          title="Upcoming recurring payments"
-          description="See subscriptions and regular bills in one place — coming soon."
-        />
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Recurring payments</CardTitle>
+            <CardDescription>
+              Regular personal expenses detected from your transactions
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {data.recurring.recurringPayments.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No clear recurring patterns yet. They appear after similar charges
+                repeat a few times.
+              </p>
+            ) : (
+              data.recurring.recurringPayments.map((item) => (
+                <RecurringPaymentRow
+                  key={item.merchantKey}
+                  item={item}
+                  currency={currency}
+                />
+              ))
+            )}
+          </CardContent>
+        </Card>
       </section>
+
+      {data.recurring.subscriptionsToReview.length > 0 ? (
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold tracking-tight">
+            Subscriptions to review
+          </h2>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>
+                Recurring service charges worth a quick check
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {data.recurring.subscriptionsToReview.map((item) => (
+                <RecurringPaymentRow
+                  key={`sub-${item.merchantKey}`}
+                  item={item}
+                  currency={currency}
+                />
+              ))}
+            </CardContent>
+          </Card>
+        </section>
+      ) : null}
 
       <DashboardPlanningPreview
         plans={data.planningPlans}

@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getTaxYears } from "@/lib/tax-years/queries";
+import { UNCATEGORIZED_CATEGORY_FILTER } from "@/lib/transactions/links";
 import type {
   TransactionFilters,
   TransactionWithRelations,
@@ -37,7 +38,9 @@ export async function getTransactions(
     query = query.eq("is_business", false);
   }
 
-  if (filters.categoryId) {
+  if (filters.categoryId === UNCATEGORIZED_CATEGORY_FILTER) {
+    query = query.is("category_id", null);
+  } else if (filters.categoryId) {
     query = query.eq("category_id", filters.categoryId);
   }
 
@@ -52,6 +55,14 @@ export async function getTransactions(
     } else {
       query = query.eq("tax_year_id", filters.taxYearId);
     }
+  }
+
+  if (filters.from) {
+    query = query.gte("transaction_date", filters.from);
+  }
+
+  if (filters.to) {
+    query = query.lte("transaction_date", filters.to);
   }
 
   const { data, error } = await query;
