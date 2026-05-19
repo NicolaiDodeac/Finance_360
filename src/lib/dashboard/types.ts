@@ -4,6 +4,8 @@ import type { SavingsGoalRow } from "@/lib/goals/types";
 import type { PlanningPlan } from "@/lib/planning/types";
 import type { DashboardBudgetSnapshot } from "@/lib/budget/types";
 import type { UserSpace } from "@/lib/spaces/types";
+import type { RecurringInsights } from "@/lib/dashboard/recurring";
+import type { SpendingInsights } from "@/lib/dashboard/spending-insights";
 
 export interface DashboardCategorySpend {
   categoryId: string | null;
@@ -65,6 +67,8 @@ export interface DashboardData {
   goals: SavingsGoalRow[];
   planningPlans: PlanningPlan[];
   attentionItems: DashboardAttentionItem[];
+  recurring: RecurringInsights;
+  spendingInsights: SpendingInsights;
   taxYearId: string | null;
   spaceContext: DashboardSpaceContext;
   budget: DashboardBudgetSnapshot;

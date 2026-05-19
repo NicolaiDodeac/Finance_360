@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import type { DashboardData } from "@/lib/dashboard/types";
+import { goalMonthlyContributionLine } from "@/lib/goals/calculations";
 import { goalProgressPercent } from "@/lib/goals/types";
 import { formatMoney } from "@/lib/transactions/format";
 
@@ -142,7 +143,7 @@ export function SharedSpaceDashboard({ data }: SharedSpaceDashboardProps) {
                       />
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      {progress}% · Shared monthly contribution — coming soon
+                      {goalMonthlyContributionLine(goal, currency, formatMoney)}
                     </p>
                   </CardContent>
                 </Card>

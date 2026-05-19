@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { buildGoalSummary } from "@/lib/goals/calculations";
 import { formatPlanDate, goalTypeLabel } from "@/lib/planning/calculations";
 import { updatePlanProgress } from "@/lib/planning/actions";
 import type { PlanningPlan, SavingsGoalType } from "@/lib/planning/types";
@@ -60,15 +61,19 @@ export function PlanningPlanCard({ plan, canManage }: PlanningPlanCardProps) {
     router.refresh();
   }
 
-  const monthlyHint =
-    plan.suggestedMonthly !== null
-      ? formatMoney(plan.suggestedMonthly, currency)
-      : "Add a target date for a monthly suggestion";
+  const summary = buildGoalSummary(
+    goal,
+    details.monthly_contribution_target !== null
+      ? Number(details.monthly_contribution_target)
+      : null
+  );
 
   const contributionDisplay =
     details.monthly_contribution_target !== null
       ? formatMoney(details.monthly_contribution_target, currency)
-      : monthlyHint;
+      : summary.suggestedMonthly !== null
+        ? formatMoney(summary.suggestedMonthly, currency)
+        : "Add a target date for a monthly suggestion";
 
   return (
     <Card>

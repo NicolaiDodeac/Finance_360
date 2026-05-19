@@ -32,6 +32,10 @@ export interface TransactionFilters {
   categoryId?: string;
   taxYearId?: string;
   hmrcCategoryIds?: string[];
+  /** Inclusive lower bound (YYYY-MM-DD). */
+  from?: string;
+  /** Inclusive upper bound (YYYY-MM-DD). */
+  to?: string;
 }
 
 export interface TransactionFormInput {

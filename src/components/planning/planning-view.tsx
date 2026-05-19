@@ -2,12 +2,15 @@ import Link from "next/link";
 import { Compass, Users } from "lucide-react";
 import { PlanningCreatePanel } from "@/components/planning/planning-create-panel";
 import { PlanningPlanCard } from "@/components/planning/planning-plan-card";
+import { PlanningSimpleGoalsSection } from "@/components/planning/planning-simple-goals-section";
 import { PlaceholderCard } from "@/components/shared/placeholder-card";
 import { Button } from "@/components/ui/button";
+import type { SavingsGoalRow } from "@/lib/goals/types";
 import type { PlanningPlan } from "@/lib/planning/types";
 
 interface PlanningViewProps {
   plans: PlanningPlan[];
+  simpleGoals: SavingsGoalRow[];
   spaceName: string;
   isShared: boolean;
   canManage: boolean;
@@ -15,6 +18,7 @@ interface PlanningViewProps {
 
 export function PlanningView({
   plans,
+  simpleGoals,
   spaceName,
   isShared,
   canManage,
@@ -60,7 +64,7 @@ export function PlanningView({
             ))}
           </div>
         </section>
-      ) : (
+      ) : plans.length === 0 && simpleGoals.length === 0 ? (
         <PlaceholderCard
           title="No plans yet"
           description="Choose a plan type below — house deposit, trip, emergency fund, or a big purchase. Each plan links to a savings goal you can track over time."
@@ -69,7 +73,9 @@ export function PlanningView({
             <Link href="/goals">View simple goals</Link>
           </Button>
         </PlaceholderCard>
-      )}
+      ) : null}
+
+      <PlanningSimpleGoalsSection goals={simpleGoals} canManage={canManage} />
 
       <PlanningCreatePanel canManage={canManage} isShared={isShared} />
     </div>

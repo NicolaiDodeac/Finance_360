@@ -69,3 +69,5 @@ export async function getPlanningPreview(
   const plans = await getPlanningPlans(spaceId);
   return plans.slice(0, limit);
 }
+
+export { getSimpleGoalsWithoutDetails } from "@/lib/goals/queries";

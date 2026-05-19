@@ -7,6 +7,8 @@ import { showsBusinessFeatures } from "@/lib/profile/types";
 import type { TaxHubSummary } from "@/lib/tax/types";
 import { buildSelfAssessmentLink } from "@/lib/tax/links";
 import type { TransactionWithRelations } from "@/lib/transactions/types";
+import { buildPersonalSpendingCategoryLink } from "@/lib/transactions/links";
+import type { SpendingInsights } from "@/lib/dashboard/spending-insights";
 import type {
   DashboardAttentionItem,
   DashboardBusinessSnapshot,
@@ -19,6 +21,8 @@ import type { SavingsGoalRow } from "@/lib/goals/types";
 import type { PlanningPlan } from "@/lib/planning/types";
 import type { DashboardBudgetSnapshot } from "@/lib/budget/types";
 import type { DashboardSpaceContext } from "@/lib/dashboard/types";
+import { detectRecurringPayments } from "@/lib/dashboard/recurring";
+import { detectSpendingInsights } from "@/lib/dashboard/spending-insights";
 
 function isInMonth(isoDate: string, year: number, month: number): boolean {
   const [y, m] = isoDate.split("-").map(Number);
@@ -225,7 +229,9 @@ function buildAttentionItems(
   financeMode: FinanceMode,
   personal: DashboardPersonalMetrics,
   business: DashboardBusinessSnapshot | null,
-  taxYearId: string | null
+  taxYearId: string | null,
+  spendingInsights: SpendingInsights,
+  subscriptionCount: number
 ): DashboardAttentionItem[] {
   const items: DashboardAttentionItem[] = [];
 
@@ -239,19 +245,30 @@ function buildAttentionItems(
     });
   }
 
-  items.push({
-    id: "unusual-spending",
-    title: "Unusual high spending",
-    description: "Spot-check large expenses when monthly patterns shift.",
-    placeholder: true,
-  });
+  if (spendingInsights.worthALook.length > 0) {
+    const top = spendingInsights.worthALook[0];
+    items.push({
+      id: "category-spending-review",
+      title: "Category spending worth a look",
+      description:
+        spendingInsights.worthALook.length === 1
+          ? `${top.categoryName} is a bit higher than your usual pattern this month.`
+          : "A few categories are a bit higher than your usual pattern this month.",
+      count: spendingInsights.worthALook.length,
+      href: buildPersonalSpendingCategoryLink(top.categoryId),
+    });
+  }
 
-  items.push({
-    id: "subscriptions",
-    title: "Subscriptions to review",
-    description: "Recurring charges you may want to keep, change, or cancel.",
-    placeholder: true,
-  });
+  if (subscriptionCount > 0) {
+    items.push({
+      id: "subscriptions-review",
+      title: "Subscriptions to review",
+      description:
+        "Recurring service charges you may want to keep, change, or cancel.",
+      count: subscriptionCount,
+      href: "/transactions?scope=personal&direction=expense",
+    });
+  }
 
   if (showsBusinessFeatures(financeMode) && business?.summary) {
     const evidenceCount = business.reviewRecommendedCount;
@@ -292,12 +309,20 @@ export function buildDashboardData(input: {
   budgetSnapshot: DashboardBudgetSnapshot;
 }): DashboardData {
   const personal = buildPersonalMetrics(input.transactions);
+  const recurring = detectRecurringPayments(input.transactions);
+  const spendingInsights = detectSpendingInsights(input.transactions);
   const { isShared } = input.spaceContext;
   const showBusiness =
     !isShared && showsBusinessFeatures(input.financeMode);
   const business = showBusiness
     ? buildBusinessSnapshot(input.taxSummary, input.taxYearLabel)
     : null;
+
+  const emptyRecurring = {
+    recurringPayments: [],
+    subscriptionsToReview: [],
+  };
+  const emptySpendingInsights = { worthALook: [] };
 
   const attentionItems = isShared
     ? [
@@ -313,7 +338,9 @@ export function buildDashboardData(input: {
         input.financeMode,
         personal,
         business,
-        input.taxYearId
+        input.taxYearId,
+        spendingInsights,
+        recurring.subscriptionsToReview.length
       );
 
   return {
@@ -325,6 +352,8 @@ export function buildDashboardData(input: {
     goals: input.goals,
     planningPlans: input.planningPlans,
     attentionItems,
+    recurring: isShared ? emptyRecurring : recurring,
+    spendingInsights: isShared ? emptySpendingInsights : spendingInsights,
     taxYearId: input.taxYearId,
     spaceContext: input.spaceContext,
     budget: input.budgetSnapshot,

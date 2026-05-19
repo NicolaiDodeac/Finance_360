@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Plus, Users } from "lucide-react";
+import { GoalCard } from "@/components/goals/goal-card";
 import { PlaceholderCard } from "@/components/shared/placeholder-card";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,11 +13,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createSavingsGoalForm } from "@/lib/goals/actions";
-import { goalProgressPercent, type SavingsGoalRow } from "@/lib/goals/types";
+import type { SavingsGoalWithMeta } from "@/lib/goals/queries";
 import { formatMoney } from "@/lib/transactions/format";
 
 interface GoalsViewProps {
-  goals: SavingsGoalRow[];
+  goals: SavingsGoalWithMeta[];
   spaceId: string;
   spaceName: string;
   isShared: boolean;
@@ -54,7 +55,7 @@ export function GoalsView({
             <CardDescription>
               {isShared
                 ? "A goal everyone in this space can see and track together."
-                : "Name your target and amount. Progress updates as you save."}
+                : "Name your target and amount. Update progress as you save."}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -120,39 +121,9 @@ export function GoalsView({
         </PlaceholderCard>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
-          {active.map((goal) => {
-            const progress = goalProgressPercent(goal);
-            return (
-              <Card key={goal.id}>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">{goal.name}</CardTitle>
-                  <CardDescription>
-                    {formatMoney(goal.current_amount, goal.currency)} of{" "}
-                    {formatMoney(goal.target_amount, goal.currency)}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="h-2 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className="h-full rounded-full bg-primary"
-                      style={{ width: `${progress}%` }}
-                    />
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    {progress}% complete
-                    {goal.target_date
-                      ? ` · Target ${new Date(`${goal.target_date}T12:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`
-                      : ""}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {isShared
-                      ? "Shared monthly contribution — coming soon"
-                      : "Suggested monthly contribution — coming soon"}
-                  </p>
-                </CardContent>
-              </Card>
-            );
-          })}
+          {active.map((goal) => (
+            <GoalCard key={goal.id} goal={goal} canManage={canManage} />
+          ))}
         </div>
       )}
 
