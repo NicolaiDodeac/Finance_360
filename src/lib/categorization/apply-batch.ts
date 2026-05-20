@@ -3,6 +3,8 @@ import {
   buildCategorizationMetadata,
   mergeRawImportCategorization,
 } from "@/lib/categorization/apply";
+import { mergeRuleFlowTypeMetadata } from "@/lib/categorization/rule-flow-type";
+import type { CategoryRow } from "@/lib/categories/queries";
 import type {
   CategorizationRuleRow,
   RuleMatchableTransaction,
@@ -20,7 +22,11 @@ export interface CategorizedTransactionFields {
 export function applyRulesToImportRow(
   tx: RuleMatchableTransaction,
   rules: CategorizationRuleRow[],
-  rawImportData: Record<string, unknown>
+  rawImportData: Record<string, unknown>,
+  options?: {
+    direction?: string;
+    categories?: CategoryRow[];
+  }
 ): CategorizedTransactionFields {
   const applied = applyCategorizationRules(tx, rules, {
     onlyFillEmpty: true,
@@ -35,11 +41,23 @@ export function applyRulesToImportRow(
     ? buildCategorizationMetadata(applied.matched_rule)
     : null;
 
+  let raw = mergeRawImportCategorization(rawImportData, metadata);
+
+  if (applied.matched_rule && applied.category_id && options?.categories) {
+    const category = options.categories.find((c) => c.id === applied.category_id);
+    const isBusiness = applied.is_business ?? false;
+    raw = mergeRuleFlowTypeMetadata(raw, {
+      categorySlug: category?.slug,
+      direction: options.direction ?? "expense",
+      isBusiness,
+    });
+  }
+
   return {
     category_id: applied.category_id,
     hmrc_category_id: applied.hmrc_category_id,
     is_business: applied.is_business ?? false,
-    raw_import_data: mergeRawImportCategorization(rawImportData, metadata),
+    raw_import_data: raw,
     matched_rule_id: applied.matched_rule?.id ?? null,
     matched_rule_name: applied.matched_rule?.name ?? null,
   };

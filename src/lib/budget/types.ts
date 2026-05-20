@@ -1,3 +1,4 @@
+import type { DashboardMonthContext } from "@/lib/dashboard/month-context";
 import type { Database } from "@/types/database";
 
 export type BudgetRow = Database["public"]["Tables"]["budgets"]["Row"];
@@ -45,6 +46,7 @@ export interface BudgetSavingsSummary {
 
 export interface BudgetPageData {
   period: BudgetPeriod;
+  month: DashboardMonthContext;
   budget: BudgetRow | null;
   items: BudgetItemWithActual[];
   summary: BudgetSummary | null;

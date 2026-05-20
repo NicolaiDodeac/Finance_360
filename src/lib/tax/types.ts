@@ -21,6 +21,7 @@ export interface TaxTransactionRow {
   merchant_name: string | null;
   notes: string | null;
   account_id: string | null;
+  raw_import_data: Record<string, unknown> | null;
   hmrc_category: TaxHmrcCategoryRef | null;
 }
 
@@ -51,11 +52,18 @@ export interface TaxReviewItem {
   href: string;
 }
 
+export interface TaxPaymentsRecorded {
+  totalAmount: number;
+  transactionCount: number;
+  transactionsHref: string;
+}
+
 export interface TaxHubSummary {
   metrics: TaxOverviewMetrics;
   categoryBreakdown: TaxCategoryBreakdownRow[];
   reviewItems: TaxReviewItem[];
   hasBusinessActivity: boolean;
+  taxPayments: TaxPaymentsRecorded;
 }
 
 export interface TaxHubData {

@@ -7,10 +7,14 @@ import {
   formatMoney,
   formatTransactionDate,
 } from "@/lib/transactions/format";
+import { ImportPreviewGroupsSummary } from "@/components/import/import-preview-groups-summary";
+import type { ImportPreviewMerchantGroup } from "@/lib/import/preview-groups";
 import type { ImportPreviewRow } from "@/lib/import/types";
 
 interface ImportPreviewStepProps {
   rows: ImportPreviewRow[];
+  previewGroups: ImportPreviewMerchantGroup[];
+  uncategorisedNewCount: number;
   adapterLabel: string;
   fileName: string;
   warnings: string[];
@@ -35,6 +39,8 @@ function statusBadge(status: ImportPreviewRow["status"]) {
 
 export function ImportPreviewStep({
   rows,
+  previewGroups,
+  uncategorisedNewCount,
   adapterLabel,
   fileName,
   warnings,
@@ -57,6 +63,13 @@ export function ImportPreviewStep({
           {newCount} new · {duplicateCount} skipped as duplicates
         </p>
       </div>
+
+      {(previewGroups.length > 0 || uncategorisedNewCount > 0) && (
+        <ImportPreviewGroupsSummary
+          groups={previewGroups}
+          uncategorisedNewCount={uncategorisedNewCount}
+        />
+      )}
 
       {warnings.length > 0 && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">

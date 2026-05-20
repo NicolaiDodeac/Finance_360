@@ -54,27 +54,28 @@ export function TransactionReceiptSection({
     );
   }
 
-  function handleUpload(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  function handleUpload() {
     setError(null);
 
-    const formData = new FormData(e.currentTarget);
-    const file = formData.get("file");
-    if (!(file instanceof File) || file.size === 0) {
+    const file = fileRef.current?.files?.[0];
+    if (!file || file.size === 0) {
       setError("Please choose a file.");
       return;
     }
 
+    const formData = new FormData();
+    formData.set("file", file);
+
     if (transaction.tax_year_id) {
       formData.set("tax_year_id", transaction.tax_year_id);
     }
-    if (transaction.merchant_name && !formData.get("merchant_name")) {
+    if (transaction.merchant_name) {
       formData.set("merchant_name", transaction.merchant_name);
     }
-    if (transaction.amount && !formData.get("total_amount")) {
+    if (transaction.amount) {
       formData.set("total_amount", String(transaction.amount));
     }
-    if (transaction.transaction_date && !formData.get("receipt_date")) {
+    if (transaction.transaction_date) {
       formData.set("receipt_date", transaction.transaction_date);
     }
 
@@ -84,7 +85,9 @@ export function TransactionReceiptSection({
         setError(result.error ?? "Could not store proof.");
         return;
       }
-      fileRef.current?.form?.reset();
+      if (fileRef.current) {
+        fileRef.current.value = "";
+      }
       router.refresh();
     });
   }
@@ -168,7 +171,7 @@ export function TransactionReceiptSection({
         </div>
       ) : (
         <>
-          <form onSubmit={handleUpload} className="space-y-3">
+          <div className="space-y-3">
             <div className="flex min-w-0 flex-col gap-2">
               <Label htmlFor="tx-receipt-file" className="text-sm font-medium">
                 Upload proof
@@ -183,11 +186,17 @@ export function TransactionReceiptSection({
                 className="text-sm file:mr-3 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1.5"
               />
             </div>
-            <Button type="submit" variant="outline" size="sm" disabled={disabled || isPending}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={disabled || isPending}
+              onClick={handleUpload}
+            >
               <Upload className="h-4 w-4" />
               {isPending ? "Storing…" : "Store & link"}
             </Button>
-          </form>
+          </div>
 
           {unmatchedReceipts.length > 0 ? (
             <div className="space-y-2 border-t border-border pt-4">

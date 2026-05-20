@@ -1,9 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
-import {
-  buildBudgetPageData,
-  getCurrentPeriod,
-} from "@/lib/budget/calculations";
-import type { BudgetItemRow, BudgetPageData, BudgetPeriod, BudgetRow } from "@/lib/budget/types";
+import { buildBudgetPageData } from "@/lib/budget/calculations";
+import type { BudgetItemRow, BudgetPageData, BudgetRow } from "@/lib/budget/types";
+import { parseMonthParam, toBudgetPeriod } from "@/lib/dashboard/month-context";
 import { getCategories } from "@/lib/categories/queries";
 import { getActiveSavingsGoals } from "@/lib/goals/queries";
 import { ensureProfile } from "@/lib/profile/queries";
@@ -58,10 +56,12 @@ export async function getBudgetForPeriod(
 
 export async function getBudgetPageData(
   userId: string,
-  period: BudgetPeriod = getCurrentPeriod()
+  monthParam?: string
 ): Promise<BudgetPageData> {
   const profile = await ensureProfile(userId);
   const { space, isShared } = await getActiveSpaceContext(userId);
+  const month = parseMonthParam(monthParam);
+  const period = toBudgetPeriod(month);
 
   const [categories, transactions, goals, budgetData] = await Promise.all([
     getCategories(userId),
@@ -72,6 +72,7 @@ export async function getBudgetPageData(
 
   return buildBudgetPageData({
     period,
+    month,
     budget: budgetData.budget,
     budgetItems: budgetData.items,
     categories,

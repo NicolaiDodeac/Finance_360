@@ -1,4 +1,5 @@
 import { applyCategorizationRules } from "@/lib/categorization/apply";
+import { shouldCountAsIncome } from "@/lib/transactions/classification";
 import type { CategorizationRuleRow } from "@/lib/categorization/types";
 import { buildTransactionsLink } from "@/lib/tax/links";
 import type { TaxTransactionRow } from "@/lib/tax/types";
@@ -10,7 +11,7 @@ export function findLikelyBusinessIncome(
   rules: CategorizationRuleRow[]
 ): SaLikelyBusinessIncomeItem[] {
   const candidates = transactions.filter(
-    (tx) => !tx.is_business && tx.direction === "income"
+    (tx) => !tx.is_business && shouldCountAsIncome(tx)
   );
 
   const items: SaLikelyBusinessIncomeItem[] = [];

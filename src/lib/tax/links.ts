@@ -2,6 +2,8 @@ export interface TransactionListLinkOptions {
   taxYearId: string;
   direction?: "income" | "expense";
   scope?: "business" | "personal";
+  /** Personal/business category id */
+  categoryId?: string;
   /** Single HMRC category id */
   hmrcCategoryId?: string;
   /** Multiple HMRC category ids (comma-separated in URL) */
@@ -17,6 +19,10 @@ export function buildTransactionsLink(
 
   if (options.direction) {
     params.set("direction", options.direction);
+  }
+
+  if (options.categoryId) {
+    params.set("category", options.categoryId);
   }
 
   if (options.hmrcCategoryIds?.length) {

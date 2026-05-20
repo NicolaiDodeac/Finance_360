@@ -8,8 +8,13 @@ import {
   Wallet,
 } from "lucide-react";
 import { DashboardBudgetCard } from "@/components/dashboard/dashboard-budget-card";
+import { DashboardMoneyFlowCard } from "@/components/dashboard/dashboard-money-flow-card";
 import { DashboardPlanningPreview } from "@/components/dashboard/dashboard-planning-preview";
-import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
+import {
+  DashboardEmptyState,
+  DashboardMonthEmptyState,
+} from "@/components/dashboard/dashboard-empty-state";
+import { monthReferenceDate } from "@/lib/dashboard/month-context";
 import { SharedSpaceDashboard } from "@/components/dashboard/shared-space-dashboard";
 import { Button } from "@/components/ui/button";
 import {
@@ -96,8 +101,10 @@ export function DashboardView({ data, taxYearId }: DashboardViewProps) {
     return <SharedSpaceDashboard data={data} />;
   }
 
-  const { personal, currency, hasTransactions } = data;
+  const { personal, currency, hasAnyTransactions, hasMonthActivity, month } = data;
   const showBusiness = showsBusinessFeatures(data.financeMode);
+  const monthRef = monthReferenceDate(month.year, month.month);
+  const showMonthPulse = hasMonthActivity;
 
   const savingsRateDisplay =
     personal.savingsRatePercent !== null
@@ -123,38 +130,41 @@ export function DashboardView({ data, taxYearId }: DashboardViewProps) {
 
   return (
     <div className="space-y-8">
-      {!hasTransactions ? <DashboardEmptyState /> : null}
+      {!hasAnyTransactions ? <DashboardEmptyState /> : null}
 
-      {hasTransactions ? (
-        <p className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Sparkles className="h-4 w-4 text-primary" />
-          {financeModeLabel(data.financeMode)} · This month at a glance
-        </p>
+      {hasAnyTransactions && !hasMonthActivity ? (
+        <DashboardMonthEmptyState monthLabel={month.label} />
       ) : null}
 
+      {showMonthPulse ? (
+      <>
+        <p className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Sparkles className="h-4 w-4 text-primary" />
+          {financeModeLabel(data.financeMode)} · {month.label} at a glance
+        </p>
       <section className="space-y-3">
         <h2 className="text-lg font-semibold tracking-tight">Your money</h2>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <MetricCard
             label="Money in"
             value={formatMoney(personal.moneyIn, currency)}
-            hint="Personal income this month"
+            hint={`Personal income in ${month.label}`}
           />
           <MetricCard
             label="Money out"
             value={formatMoney(personal.moneyOut, currency)}
-            hint="Personal spending this month"
+            hint={`All personal outflows in ${month.label} (includes savings and debt)`}
           />
           <MetricCard
             label="Net cashflow"
             value={formatMoney(personal.netCashflow, currency)}
-            hint="Income minus expenses"
+            hint="Income minus all outflows"
             emphasis
           />
           <MetricCard
             label="Savings rate"
             value={savingsRateDisplay}
-            hint="Share of income left after expenses"
+            hint="Share of income left after lifestyle spending"
           />
           <MetricCard
             label="Top spending category"
@@ -170,21 +180,27 @@ export function DashboardView({ data, taxYearId }: DashboardViewProps) {
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
+        <DashboardMoneyFlowCard
+          moneyFlow={personal.moneyFlow}
+          monthLabel={month.label}
+          currency={currency}
+        />
+
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Spending by category</CardTitle>
-            <CardDescription>Personal expenses this month</CardDescription>
+            <CardDescription>Lifestyle spending in {month.label}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {personal.spendingByCategory.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                No personal expenses recorded this month yet.
+                No lifestyle spending recorded for {month.label} yet.
               </p>
             ) : (
               personal.spendingByCategory.slice(0, 6).map((row) => (
                 <Link
                   key={row.categoryId ?? row.categoryName}
-                  href={buildPersonalSpendingCategoryLink(row.categoryId)}
+                  href={buildPersonalSpendingCategoryLink(row.categoryId, monthRef)}
                   className="block space-y-1 rounded-lg px-2 py-1.5 -mx-2 transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
                 >
                   <div className="flex justify-between text-sm">
@@ -207,33 +223,33 @@ export function DashboardView({ data, taxYearId }: DashboardViewProps) {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="text-base">Monthly cashflow trend</CardTitle>
             <CardDescription>Personal net over the last six months</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {personal.monthlyCashflow.map((month) => (
-              <div key={month.monthKey} className="space-y-1">
+            {personal.monthlyCashflow.map((monthRow) => (
+              <div key={monthRow.monthKey} className="space-y-1">
                 <div className="flex justify-between text-sm">
-                  <span>{month.label}</span>
+                  <span>{monthRow.label}</span>
                   <span
                     className={`tabular-nums ${
-                      month.net >= 0
+                      monthRow.net >= 0
                         ? "text-emerald-700 dark:text-emerald-400"
                         : "text-muted-foreground"
                     }`}
                   >
-                    {formatMoney(month.net, currency)}
+                    {formatMoney(monthRow.net, currency)}
                   </span>
                 </div>
                 <div className="flex h-2 overflow-hidden rounded-full bg-muted">
                   <div
                     className={`h-full rounded-full ${
-                      month.net >= 0 ? "bg-emerald-500/70" : "bg-amber-500/60"
+                      monthRow.net >= 0 ? "bg-emerald-500/70" : "bg-amber-500/60"
                     }`}
                     style={{
-                      width: `${(Math.abs(month.net) / maxMonthlyNet) * 100}%`,
+                      width: `${(Math.abs(monthRow.net) / maxMonthlyNet) * 100}%`,
                     }}
                   />
                 </div>
@@ -242,9 +258,15 @@ export function DashboardView({ data, taxYearId }: DashboardViewProps) {
           </CardContent>
         </Card>
       </section>
+      </>
+      ) : null}
 
       <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <DashboardBudgetCard snapshot={data.budget} currency={currency} />
+        <DashboardBudgetCard
+          snapshot={data.budget}
+          currency={currency}
+          month={data.month}
+        />
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Savings goals</CardTitle>
@@ -298,8 +320,11 @@ export function DashboardView({ data, taxYearId }: DashboardViewProps) {
           <CardContent className="space-y-4">
             {data.recurring.recurringPayments.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                No clear recurring patterns yet. They appear after similar charges
-                repeat a few times.
+                {showMonthPulse
+                  ? "No recurring payments detected for this month."
+                  : hasAnyTransactions
+                    ? `No recurring payments recorded for ${month.label}.`
+                    : "No clear recurring patterns yet. They appear after similar charges repeat a few times."}
               </p>
             ) : (
               data.recurring.recurringPayments.map((item) => (
@@ -314,7 +339,7 @@ export function DashboardView({ data, taxYearId }: DashboardViewProps) {
         </Card>
       </section>
 
-      {data.recurring.subscriptionsToReview.length > 0 ? (
+      {showMonthPulse && data.recurring.subscriptionsToReview.length > 0 ? (
         <section className="space-y-3">
           <h2 className="text-lg font-semibold tracking-tight">
             Subscriptions to review
@@ -343,6 +368,7 @@ export function DashboardView({ data, taxYearId }: DashboardViewProps) {
         currency={currency}
       />
 
+      {showMonthPulse ? (
       <section className="space-y-3">
         <h2 className="text-lg font-semibold tracking-tight">Needs attention</h2>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -375,6 +401,7 @@ export function DashboardView({ data, taxYearId }: DashboardViewProps) {
           ))}
         </div>
       </section>
+      ) : null}
 
       {showBusiness && data.business ? (
         <section className="space-y-4 rounded-xl border border-border/80 bg-muted/30 p-4 sm:p-6">
@@ -433,7 +460,7 @@ export function DashboardView({ data, taxYearId }: DashboardViewProps) {
         </section>
       ) : null}
 
-      {!hasTransactions ? (
+      {!hasAnyTransactions ? (
         <div className="flex items-center gap-2 rounded-lg border border-dashed px-4 py-3 text-sm text-muted-foreground">
           <Wallet className="h-4 w-4 shrink-0" />
           <span>

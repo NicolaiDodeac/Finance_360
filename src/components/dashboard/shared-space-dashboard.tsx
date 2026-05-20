@@ -106,7 +106,11 @@ export function SharedSpaceDashboard({ data }: SharedSpaceDashboardProps) {
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold tracking-tight">Household monthly plan</h2>
-        <DashboardBudgetCard snapshot={data.budget} currency={currency} />
+        <DashboardBudgetCard
+          snapshot={data.budget}
+          currency={currency}
+          month={data.month}
+        />
       </section>
 
       <section className="space-y-3">

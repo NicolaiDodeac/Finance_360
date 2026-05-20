@@ -57,7 +57,7 @@ src/
     ├── auth/           # requireAuth, getUser helpers
     ├── transactions/   # Future transaction logic
     ├── tax/            # Future UK tax logic
-    └── categorization/ # Future AI/rules categorization
+    └── categorization/ # Rules, merchant groups, business assistant
 ```
 
 ## Routes
@@ -66,10 +66,18 @@ src/
 |-------|-------------|
 | `/dashboard` | Financial overview |
 | `/transactions` | Transaction list |
+| `/transactions/categorise` | Business categorisation assistant |
+| `/transactions/import` | CSV / PDF import |
 | `/goals` | Savings goals |
 | `/tax` | Tax Hub |
+| `/tax/self-assessment` | Self Assessment prep |
 | `/receipts` | Receipt storage |
 | `/insights` | Analytics & AI insights |
 | `/settings` | Account settings |
+| `/settings/rules` | Categorisation rules |
 
 Protected routes require authentication via middleware.
+
+## Manual testing
+
+Before release or after categorisation changes, run the checklist in [docs/manual-test-categorisation.md](docs/manual-test-categorisation.md) (Lloyds PDF import, salary vs self-employed income, personal vs business expenses, mixed %, merchant rules, dashboard/tax/SA updates).

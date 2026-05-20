@@ -1,3 +1,4 @@
+import { shouldCountInLifestyleSpending } from "@/lib/transactions/classification";
 import type { TransactionWithRelations } from "@/lib/transactions/types";
 
 export type RecurringFrequency = "weekly" | "fortnightly" | "monthly" | "irregular";
@@ -80,7 +81,7 @@ const AMOUNT_TOLERANCE_RATIO = 0.2;
 const AMOUNT_TOLERANCE_ABSOLUTE = 2;
 
 function isPersonalExpense(tx: TransactionWithRelations): boolean {
-  return !tx.is_business && tx.direction === "expense";
+  return shouldCountInLifestyleSpending(tx);
 }
 
 function normalizeMerchantKey(tx: TransactionWithRelations): string | null {
@@ -263,6 +264,41 @@ export function looksLikeSubscription(merchantKey: string): boolean {
   return SUBSCRIPTION_MERCHANT_PATTERNS.some((pattern) =>
     merchantKey.includes(pattern)
   );
+}
+
+function isInMonth(isoDate: string, year: number, month: number): boolean {
+  const [y, m] = isoDate.split("-").map(Number);
+  return y === year && m === month;
+}
+
+function recurringActiveInMonth(
+  payment: RecurringPayment,
+  transactions: TransactionWithRelations[],
+  year: number,
+  month: number
+): boolean {
+  return transactions.some((tx) => {
+    if (!isPersonalExpense(tx)) return false;
+    const key = normalizeMerchantKey(tx);
+    if (key !== payment.merchantKey) return false;
+    return isInMonth(tx.transaction_date, year, month);
+  });
+}
+
+export function filterRecurringForMonth(
+  insights: RecurringInsights,
+  transactions: TransactionWithRelations[],
+  year: number,
+  month: number
+): RecurringInsights {
+  return {
+    recurringPayments: insights.recurringPayments.filter((item) =>
+      recurringActiveInMonth(item, transactions, year, month)
+    ),
+    subscriptionsToReview: insights.subscriptionsToReview.filter((item) =>
+      recurringActiveInMonth(item, transactions, year, month)
+    ),
+  };
 }
 
 export function detectRecurringPayments(

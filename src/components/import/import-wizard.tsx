@@ -125,6 +125,8 @@ export function ImportWizard({ accounts, defaultAccountId }: ImportWizardProps) 
       {step === "preview" && parseResult && (
         <ImportPreviewStep
           rows={parseResult.preview_rows}
+          previewGroups={parseResult.preview_groups}
+          uncategorisedNewCount={parseResult.uncategorised_new_count}
           adapterLabel={parseResult.adapterLabel}
           fileName={parseResult.fileName}
           warnings={parseResult.warnings}

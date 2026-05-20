@@ -4,6 +4,7 @@ import Link from "next/link";
 import { CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ImportTransactionsResult } from "@/lib/import/types";
+import { CATEGORISE_ASSISTANT_PATH } from "@/lib/transactions/links";
 
 interface ImportCompleteStepProps {
   result: ImportTransactionsResult;
@@ -32,6 +33,13 @@ export function ImportCompleteStep({
         <Button type="button" variant="outline" onClick={onImportAnother}>
           Import another file
         </Button>
+        {result.imported > 0 && (
+          <Button type="button" variant="secondary" asChild>
+            <Link href={CATEGORISE_ASSISTANT_PATH}>
+              Categorise imported transactions
+            </Link>
+          </Button>
+        )}
         <Button type="button" asChild>
           <Link href="/transactions">View transactions</Link>
         </Button>

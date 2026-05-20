@@ -7,6 +7,7 @@ import {
   getCurrentPeriod,
   SUGGESTED_BUDGET_CATEGORY_SLUGS,
 } from "@/lib/budget/calculations";
+import { formatMonthLabel } from "@/lib/dashboard/month-context";
 import { getBudgetForPeriod } from "@/lib/budget/queries";
 import { getCategories } from "@/lib/categories/queries";
 import { getSelectableCategories } from "@/lib/categories/display";
@@ -34,7 +35,20 @@ export async function createMonthlyBudget(
     };
   }
 
-  const period = getCurrentPeriod();
+  const yearRaw = Number(formData.get("year"));
+  const monthRaw = Number(formData.get("month"));
+  const period =
+    Number.isFinite(yearRaw) &&
+    Number.isFinite(monthRaw) &&
+    yearRaw >= 2000 &&
+    monthRaw >= 1 &&
+    monthRaw <= 12
+      ? {
+          year: yearRaw,
+          month: monthRaw,
+          label: formatMonthLabel(yearRaw, monthRaw),
+        }
+      : getCurrentPeriod();
   const existing = await getBudgetForPeriod(space.id, period.year, period.month);
   if (existing.budget) {
     return {

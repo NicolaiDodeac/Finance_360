@@ -8,6 +8,11 @@ import {
   SUGGESTED_TAX_POT_RATE,
 } from "@/lib/tax/constants";
 import { buildTransactionsLink } from "@/lib/tax/links";
+import {
+  countsAsBusinessTurnover,
+  getFlowType,
+} from "@/lib/transactions/classification";
+import type { TaxPaymentsRecorded } from "@/lib/tax/types";
 import type {
   TaxCategoryBreakdownRow,
   TaxHubSummary,
@@ -19,11 +24,17 @@ function sumAmounts(rows: TaxTransactionRow[]): number {
   return rows.reduce((total, row) => total + Number(row.amount), 0);
 }
 
-function isBusinessIncome(tx: TaxTransactionRow): boolean {
-  return tx.is_business && tx.direction === "income";
+function isTurnoverIncome(tx: TaxTransactionRow): boolean {
+  return countsAsBusinessTurnover(tx);
+}
+
+function isTaxPaymentExpense(tx: TaxTransactionRow): boolean {
+  if (tx.direction !== "expense") return false;
+  return getFlowType(tx) === "tax_payment";
 }
 
 function isBusinessExpense(tx: TaxTransactionRow): boolean {
+  if (isTaxPaymentExpense(tx)) return false;
   return tx.is_business && tx.direction === "expense";
 }
 
@@ -121,9 +132,10 @@ function buildReviewItems(
 
 export function computeTaxHubSummary(
   taxYearId: string,
-  transactions: TaxTransactionRow[]
+  transactions: TaxTransactionRow[],
+  taxPayments: TaxPaymentsRecorded
 ): TaxHubSummary {
-  const businessIncome = transactions.filter(isBusinessIncome);
+  const businessIncome = transactions.filter(isTurnoverIncome);
   const businessExpenses = transactions.filter(isBusinessExpense);
   const allowableExpenses = businessExpenses.filter(isAllowableExpense);
 
@@ -160,5 +172,6 @@ export function computeTaxHubSummary(
     reviewItems: buildReviewItems(taxYearId, businessExpenses, evaluations),
     hasBusinessActivity:
       businessIncome.length > 0 || businessExpenses.length > 0,
+    taxPayments,
   };
 }

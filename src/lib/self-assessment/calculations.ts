@@ -21,17 +21,24 @@ import type {
 } from "@/lib/self-assessment/types";
 import { HIGH_VALUE_EXPENSE_THRESHOLD, SUGGESTED_TAX_POT_RATE } from "@/lib/tax/constants";
 import { buildTransactionsLink } from "@/lib/tax/links";
+import {
+  countsAsBusinessTurnover,
+  getFlowType,
+} from "@/lib/transactions/classification";
 import type { TaxHmrcCategoryRef, TaxReviewItem, TaxTransactionRow } from "@/lib/tax/types";
 
 function sumAmounts(rows: TaxTransactionRow[]): number {
   return rows.reduce((total, row) => total + Number(row.amount), 0);
 }
 
-function isBusinessIncome(tx: TaxTransactionRow): boolean {
-  return tx.is_business && tx.direction === "income";
+function isTurnoverIncome(tx: TaxTransactionRow): boolean {
+  return countsAsBusinessTurnover(tx);
 }
 
 function isBusinessExpense(tx: TaxTransactionRow): boolean {
+  if (tx.direction === "expense" && getFlowType(tx) === "tax_payment") {
+    return false;
+  }
   return tx.is_business && tx.direction === "expense";
 }
 
@@ -282,7 +289,7 @@ export function computeSelfAssessmentPrepSummary(
     rules,
   } = input;
 
-  const businessIncome = businessTransactions.filter(isBusinessIncome);
+  const businessIncome = businessTransactions.filter(isTurnoverIncome);
   const businessExpenses = businessTransactions.filter(isBusinessExpense);
   const allowableExpenses = businessExpenses.filter(isAllowableExpense);
 

@@ -1,5 +1,7 @@
+import { Suspense } from "react";
 import { PageHeader } from "@/components/shared/page-header";
 import { BudgetView } from "@/components/budget/budget-view";
+import { DashboardMonthSwitcher } from "@/components/dashboard/dashboard-month-switcher";
 import { requireAuth } from "@/lib/auth/helpers";
 import { getBudgetPageData } from "@/lib/budget/queries";
 import { getCategories } from "@/lib/categories/queries";
@@ -7,7 +9,22 @@ import { getSelectableCategories } from "@/lib/categories/display";
 import { getActiveSpaceContext } from "@/lib/spaces/queries";
 import { spaceSwitcherLabel } from "@/lib/spaces/types";
 
-export default async function BudgetPage() {
+interface BudgetPageProps {
+  searchParams: Promise<{
+    month?: string;
+  }>;
+}
+
+function MonthSwitcherFallback() {
+  return (
+    <div className="flex h-9 items-center justify-center" aria-hidden>
+      <span className="sr-only">Loading month</span>
+    </div>
+  );
+}
+
+export default async function BudgetPage({ searchParams }: BudgetPageProps) {
+  const { month: monthParam } = await searchParams;
   const user = await requireAuth();
   const { space, isShared } = await getActiveSpaceContext(user.id);
 
@@ -15,7 +32,7 @@ export default async function BudgetPage() {
   let loadError: string | null = null;
 
   try {
-    data = await getBudgetPageData(user.id);
+    data = await getBudgetPageData(user.id, monthParam);
   } catch (err) {
     loadError =
       err instanceof Error ? err.message : "Failed to load your monthly plan.";
@@ -39,6 +56,13 @@ export default async function BudgetPage() {
             : "Guide your spending with a flexible monthly plan — no guilt, just clarity."
         }
       />
+      {data ? (
+        <div className="mb-6">
+          <Suspense fallback={<MonthSwitcherFallback />}>
+            <DashboardMonthSwitcher month={data.month} ariaLabel="Budget month" />
+          </Suspense>
+        </div>
+      ) : null}
       {loadError ? (
         <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
           {loadError}

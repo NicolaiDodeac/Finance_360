@@ -41,3 +41,4 @@ export async function ensureUserSetup(userId: string): Promise<UserSetupResult> 
 }
 
 export { getSetupStatus };
+export { ensureDefaultCategories } from "@/lib/setup/categories";

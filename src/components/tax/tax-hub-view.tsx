@@ -10,6 +10,7 @@ import { TaxOverviewCards } from "@/components/tax/tax-overview-cards";
 import { EvidenceExplainerPanel } from "@/components/evidence/evidence-explainer-panel";
 import { TaxEvidenceSummary } from "@/components/tax/tax-evidence-summary";
 import { TaxReviewSection } from "@/components/tax/tax-review-section";
+import { TaxPaymentsRecordedSection } from "@/components/tax/tax-payments-recorded";
 import { TaxYearSelector } from "@/components/tax/tax-year-selector";
 
 interface TaxHubViewProps {
@@ -46,6 +47,10 @@ export function TaxHubView({ data, loadError }: TaxHubViewProps) {
         />
         <TaxHubActions taxYearId={selectedTaxYear.id} />
       </div>
+
+      {summary ? (
+        <TaxPaymentsRecordedSection taxPayments={summary.taxPayments} />
+      ) : null}
 
       {summary && !summary.hasBusinessActivity ? (
         <TaxHubEmptyNoActivity

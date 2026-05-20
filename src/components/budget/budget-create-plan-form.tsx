@@ -38,12 +38,14 @@ interface BudgetCreatePlanFormProps {
   period: BudgetPeriod;
   expenseCategories: CategoryRow[];
   allCategories: CategoryRow[];
+  isFirstPlan?: boolean;
 }
 
 export function BudgetCreatePlanForm({
   period,
   expenseCategories,
   allCategories,
+  isFirstPlan = false,
 }: BudgetCreatePlanFormProps) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -77,7 +79,9 @@ export function BudgetCreatePlanForm({
             <Sparkles className="h-5 w-5 text-primary" />
           </span>
           <div>
-            <CardTitle className="text-lg">Your first monthly plan</CardTitle>
+            <CardTitle className="text-lg">
+              {isFirstPlan ? "Your first monthly plan" : `Plan for ${period.label}`}
+            </CardTitle>
             <CardDescription>
               Set gentle spending guides for {period.label}. This is about awareness,
               not restrictions.
@@ -88,6 +92,8 @@ export function BudgetCreatePlanForm({
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
           <input type="hidden" name="name" value={defaultBudgetName(period)} />
+          <input type="hidden" name="year" value={period.year} />
+          <input type="hidden" name="month" value={period.month} />
           <div className="grid gap-4 sm:grid-cols-2">
             {suggested.map((slug) => (
               <div key={slug} className="space-y-2">
@@ -133,7 +139,11 @@ export function BudgetCreatePlanForm({
             <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
           ) : null}
           <Button type="submit" disabled={pending}>
-            {pending ? "Creating…" : "Create monthly plan"}
+            {pending
+              ? "Creating…"
+              : isFirstPlan
+                ? "Create monthly plan"
+                : `Create plan for ${period.label}`}
           </Button>
         </form>
       </CardContent>

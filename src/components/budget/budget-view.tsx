@@ -68,22 +68,28 @@ export function BudgetView({ data, expenseCategories, allCategories }: BudgetVie
   if (!budget) {
     return (
       <div className="space-y-6">
-        <PlaceholderCard
-          title="Guide your month with intention"
-          description="Set monthly targets by category to stay aware of spending — without rigid limits or guilt. Link your plan to savings goals when you are ready."
-        >
-          <Button type="button" variant="outline" size="sm" asChild>
-            <Link href="/goals">
-              <PiggyBank className="mr-2 h-4 w-4" />
-              View savings goals
-            </Link>
-          </Button>
-        </PlaceholderCard>
+        <Card className="border-dashed">
+          <CardHeader>
+            <CardTitle className="text-base">Monthly plan</CardTitle>
+            <CardDescription>
+              No monthly plan for {period.label} yet.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/goals">
+                <PiggyBank className="mr-2 h-4 w-4" />
+                View savings goals
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
         {canManage ? (
           <BudgetCreatePlanForm
             period={period}
             expenseCategories={expenseCategories}
             allCategories={allCategories}
+            isFirstPlan={data.month.isCurrentMonth}
           />
         ) : isShared ? (
           <PlaceholderCard
@@ -165,7 +171,7 @@ export function BudgetView({ data, expenseCategories, allCategories }: BudgetVie
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Monthly cashflow</CardTitle>
-            <CardDescription>Personal money in and out this month</CardDescription>
+            <CardDescription>Personal money in and out in {period.label}</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-3">
             <div>
@@ -272,7 +278,7 @@ export function BudgetView({ data, expenseCategories, allCategories }: BudgetVie
       {topSpendingCategories.length > 0 ? (
         <section className="space-y-3">
           <h2 className="text-lg font-semibold tracking-tight">
-            Top spending this month
+            Top spending in {period.label}
           </h2>
           <Card>
             <CardContent className="space-y-3 pt-6">
