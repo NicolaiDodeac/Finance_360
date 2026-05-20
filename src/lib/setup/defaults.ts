@@ -30,15 +30,21 @@ export interface DefaultCategoryParent {
   sort_order: number;
 }
 
+export type DefaultCategoryParentSlug =
+  | "income"
+  | "expenses"
+  | "financial-flows";
+
 export interface DefaultCategoryChild {
   name: string;
   slug: string;
-  parent_slug: "income" | "expenses";
+  parent_slug: DefaultCategoryParentSlug;
   sort_order: number;
 }
 
 export const DEFAULT_CATEGORY_PARENTS: DefaultCategoryParent[] = [
   { name: "Income", slug: "income", sort_order: 0 },
+  { name: "Financial flows", slug: "financial-flows", sort_order: 50 },
   { name: "Expenses", slug: "expenses", sort_order: 100 },
 ];
 
@@ -51,6 +57,18 @@ export const DEFAULT_CATEGORY_CHILDREN: DefaultCategoryChild[] = [
     sort_order: 10,
   },
   { name: "Refunds", slug: "refunds", parent_slug: "income", sort_order: 20 },
+  {
+    name: "Investment income",
+    slug: "investment-income",
+    parent_slug: "income",
+    sort_order: 30,
+  },
+  {
+    name: "Benefit payment",
+    slug: "benefits",
+    parent_slug: "income",
+    sort_order: 40,
+  },
   {
     name: "Other income",
     slug: "other-income",
@@ -116,24 +134,62 @@ export const DEFAULT_CATEGORY_CHILDREN: DefaultCategoryChild[] = [
   { name: "Gifts", slug: "gifts", parent_slug: "expenses", sort_order: 160 },
   { name: "Bank fees", slug: "bank-fees", parent_slug: "expenses", sort_order: 170 },
   {
-    name: "Tax payment",
-    slug: "tax-payment",
-    parent_slug: "expenses",
-    sort_order: 180,
-  },
-  {
-    name: "Savings transfer",
-    slug: "savings-transfer",
-    parent_slug: "expenses",
-    sort_order: 190,
-  },
-  {
     name: "Other expense",
     slug: "other-expense",
     parent_slug: "expenses",
     sort_order: 200,
   },
+  {
+    name: "Transfer",
+    slug: "savings-transfer",
+    parent_slug: "financial-flows",
+    sort_order: 0,
+  },
+  {
+    name: "Savings contribution",
+    slug: "savings-contribution",
+    parent_slug: "financial-flows",
+    sort_order: 10,
+  },
+  {
+    name: "Investment contribution",
+    slug: "investment-contribution",
+    parent_slug: "financial-flows",
+    sort_order: 20,
+  },
+  {
+    name: "Debt repayment",
+    slug: "debt-repayment",
+    parent_slug: "financial-flows",
+    sort_order: 30,
+  },
+  {
+    name: "Tax payment",
+    slug: "tax-payment",
+    parent_slug: "financial-flows",
+    sort_order: 40,
+  },
 ];
+
+const defaultChildBySlug = new Map(
+  DEFAULT_CATEGORY_CHILDREN.map((child) => [child.slug, child])
+);
+
+/** Lookup default child category definition by slug (for on-demand creation). */
+export function getDefaultCategoryChildBySlug(
+  slug: string
+): DefaultCategoryChild | undefined {
+  return defaultChildBySlug.get(slug);
+}
+
+/** All default child slugs used by Flow Type categorisation. */
+export const FLOW_TYPE_CATEGORY_SLUGS = [
+  "savings-transfer",
+  "savings-contribution",
+  "investment-contribution",
+  "debt-repayment",
+  "tax-payment",
+] as const;
 
 /** Slugs that must exist for categories to be considered fully initialized. */
 export const REQUIRED_CATEGORY_SLUGS = [

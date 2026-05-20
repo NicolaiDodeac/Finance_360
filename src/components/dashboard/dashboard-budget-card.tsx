@@ -10,6 +10,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { budgetStatusTone } from "@/lib/budget/calculations";
+import { buildBudgetHref } from "@/lib/dashboard/month-context";
+import type { DashboardMonthContext } from "@/lib/dashboard/month-context";
 import type { DashboardBudgetSnapshot } from "@/lib/budget/types";
 import { formatMoney } from "@/lib/transactions/format";
 import { cn } from "@/lib/utils";
@@ -17,26 +19,30 @@ import { cn } from "@/lib/utils";
 interface DashboardBudgetCardProps {
   snapshot: DashboardBudgetSnapshot;
   currency: string;
+  month: Pick<DashboardMonthContext, "label" | "param" | "isCurrentMonth">;
 }
 
 export function DashboardBudgetCard({
   snapshot,
   currency,
+  month,
 }: DashboardBudgetCardProps) {
+  const budgetHref = buildBudgetHref(month);
+
   if (!snapshot.hasBudget || !snapshot.summary) {
     return (
       <Card className="border-dashed">
         <CardHeader>
           <CardTitle className="text-base">Monthly plan</CardTitle>
           <CardDescription>
-            Set gentle category targets and stay aware of your spending this month.
+            No monthly plan for {month.label} yet.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Button type="button" variant="outline" size="sm" asChild>
-            <Link href="/budget">
+            <Link href={budgetHref}>
               <Wallet className="mr-2 h-4 w-4" />
-              Create your first plan
+              Create plan for {month.label}
             </Link>
           </Button>
         </CardContent>
@@ -59,7 +65,7 @@ export function DashboardBudgetCard({
         <div className="flex items-start justify-between gap-2">
           <div>
             <CardTitle className="text-base">Monthly plan</CardTitle>
-            <CardDescription>This month&apos;s spending progress</CardDescription>
+            <CardDescription>Spending progress for {month.label}</CardDescription>
           </div>
           <BudgetStatusBadge status={summary.status} />
         </div>
@@ -96,10 +102,12 @@ export function DashboardBudgetCard({
             {topItem ? ` · ${topItem.categoryName} at ${topItem.percentUsed}%` : ""}
           </p>
         ) : (
-          <p className="text-xs text-muted-foreground">You are on track this month.</p>
+          <p className="text-xs text-muted-foreground">
+            You are on track for {month.label}.
+          </p>
         )}
         <Button type="button" variant="outline" size="sm" asChild>
-          <Link href="/budget">
+          <Link href={budgetHref}>
             View budget
             <ArrowRight className="ml-2 h-4 w-4" />
           </Link>

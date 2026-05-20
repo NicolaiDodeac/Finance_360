@@ -6,8 +6,22 @@ import type { FinanceMode } from "@/lib/profile/types";
 import { showsBusinessFeatures } from "@/lib/profile/types";
 import type { TaxHubSummary } from "@/lib/tax/types";
 import { buildSelfAssessmentLink } from "@/lib/tax/links";
+import { buildDashboardMoneyFlow } from "@/lib/dashboard/money-flow";
+import {
+  getFlowType,
+  shouldCountAsIncome,
+  shouldCountInLifestyleSpending,
+} from "@/lib/transactions/classification";
 import type { TransactionWithRelations } from "@/lib/transactions/types";
-import { buildPersonalSpendingCategoryLink } from "@/lib/transactions/links";
+import {
+  buildPersonalSpendingCategoryLink,
+  buildTransactionsFilterLink,
+} from "@/lib/transactions/links";
+import {
+  isTransactionInMonth,
+  monthReferenceDate,
+  type DashboardMonthContext,
+} from "@/lib/dashboard/month-context";
 import type { SpendingInsights } from "@/lib/dashboard/spending-insights";
 import type {
   DashboardAttentionItem,
@@ -21,13 +35,11 @@ import type { SavingsGoalRow } from "@/lib/goals/types";
 import type { PlanningPlan } from "@/lib/planning/types";
 import type { DashboardBudgetSnapshot } from "@/lib/budget/types";
 import type { DashboardSpaceContext } from "@/lib/dashboard/types";
-import { detectRecurringPayments } from "@/lib/dashboard/recurring";
+import {
+  detectRecurringPayments,
+  filterRecurringForMonth,
+} from "@/lib/dashboard/recurring";
 import { detectSpendingInsights } from "@/lib/dashboard/spending-insights";
-
-function isInMonth(isoDate: string, year: number, month: number): boolean {
-  const [y, m] = isoDate.split("-").map(Number);
-  return y === year && m === month;
-}
 
 function monthKey(year: number, month: number): string {
   return `${year}-${String(month).padStart(2, "0")}`;
@@ -48,8 +60,13 @@ function sumByDirection(
   rows: TransactionWithRelations[],
   direction: "income" | "expense"
 ): number {
+  if (direction === "income") {
+    return rows
+      .filter(shouldCountAsIncome)
+      .reduce((sum, tx) => sum + Number(tx.amount), 0);
+  }
   return rows
-    .filter((tx) => tx.direction === direction)
+    .filter((tx) => !tx.is_business && tx.direction === "expense")
     .reduce((sum, tx) => sum + Number(tx.amount), 0);
 }
 
@@ -59,6 +76,7 @@ function buildCategorySpending(
   const map = new Map<string, DashboardCategorySpend>();
 
   for (const tx of expenses) {
+    if (!shouldCountInLifestyleSpending(tx)) continue;
     const key = tx.category_id ?? "__uncategorized__";
     const categoryName = tx.category?.name ?? "Uncategorized";
     const existing = map.get(key);
@@ -80,17 +98,19 @@ function buildCategorySpending(
 
 function buildMonthlyCashflow(
   personalRows: TransactionWithRelations[],
+  endYear: number,
+  endMonth: number,
   months = 6
 ): DashboardMonthlyCashflow[] {
-  const now = new Date();
+  const endDate = new Date(endYear, endMonth - 1, 1);
   const result: DashboardMonthlyCashflow[] = [];
 
   for (let i = months - 1; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const d = new Date(endDate.getFullYear(), endDate.getMonth() - i, 1);
     const year = d.getFullYear();
     const month = d.getMonth() + 1;
     const inMonth = personalRows.filter((tx) =>
-      isInMonth(tx.transaction_date, year, month)
+      isTransactionInMonth(tx.transaction_date, year, month)
     );
     const moneyIn = sumByDirection(inMonth, "income");
     const moneyOut = sumByDirection(inMonth, "expense");
@@ -108,28 +128,31 @@ function buildMonthlyCashflow(
 }
 
 function buildPersonalMetrics(
-  transactions: TransactionWithRelations[]
+  transactions: TransactionWithRelations[],
+  month: DashboardMonthContext,
+  financeMode: FinanceMode
 ): DashboardPersonalMetrics {
   const personal = transactions.filter(isPersonal);
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
+  const { year, month: monthNumber } = month;
 
-  const thisMonth = personal.filter((tx) =>
-    isInMonth(tx.transaction_date, year, month)
+  const thisMonthAll = transactions.filter((tx) =>
+    isTransactionInMonth(tx.transaction_date, year, monthNumber)
   );
-  const thisMonthExpenses = thisMonth.filter((tx) => tx.direction === "expense");
+  const thisMonth = thisMonthAll.filter(isPersonal);
+  const thisMonthExpenses = thisMonth.filter(shouldCountInLifestyleSpending);
+  const moneyFlow = buildDashboardMoneyFlow(thisMonthAll, financeMode);
 
   const moneyIn = sumByDirection(thisMonth, "income");
   const moneyOut = sumByDirection(thisMonth, "expense");
   const netCashflow = moneyIn - moneyOut;
+  const personalSpending = moneyFlow.personalSpending;
   const savingsRatePercent =
-    moneyIn > 0 ? Math.round((netCashflow / moneyIn) * 100) : null;
+    moneyIn > 0
+      ? Math.round(((moneyIn - personalSpending) / moneyIn) * 100)
+      : null;
 
   const spendingByCategory = buildCategorySpending(thisMonthExpenses);
-  const uncategorizedExpenseAllTime = personal.filter(
-    (tx) => tx.direction === "expense" && !tx.category_id
-  ).length;
+  const uncategorizedInMonth = thisMonthExpenses.filter((tx) => !tx.category_id).length;
 
   const inputs = thisMonthExpenses.map(toEvidenceInput);
   const evaluations = evaluateManyTransactions(inputs, {
@@ -138,6 +161,16 @@ function buildPersonalMetrics(
 
   const reviewRecommendedTotal = new Set<string>();
   for (const tx of thisMonthExpenses) {
+    const flowType = getFlowType(tx);
+    if (
+      flowType === "savings" ||
+      flowType === "investment" ||
+      flowType === "debt_repayment" ||
+      flowType === "transfer" ||
+      flowType === "tax_payment"
+    ) {
+      continue;
+    }
     if (!tx.category_id) {
       reviewRecommendedTotal.add(tx.id);
     }
@@ -151,12 +184,23 @@ function buildPersonalMetrics(
     moneyOut,
     netCashflow,
     savingsRatePercent,
+    moneyFlow,
     topSpendingCategory: spendingByCategory[0] ?? null,
     reviewRecommendedCount: reviewRecommendedTotal.size,
-    uncategorizedCount: uncategorizedExpenseAllTime,
+    uncategorizedCount: uncategorizedInMonth,
     spendingByCategory,
-    monthlyCashflow: buildMonthlyCashflow(personal),
+    monthlyCashflow: buildMonthlyCashflow(personal, year, monthNumber),
   };
+}
+
+function hasPersonalActivityInMonth(
+  transactions: TransactionWithRelations[],
+  year: number,
+  month: number
+): boolean {
+  return transactions.some(
+    (tx) => !tx.is_business && isTransactionInMonth(tx.transaction_date, year, month)
+  );
 }
 
 function buildTaxReadiness(summary: TaxHubSummary | null): {
@@ -231,9 +275,12 @@ function buildAttentionItems(
   business: DashboardBusinessSnapshot | null,
   taxYearId: string | null,
   spendingInsights: SpendingInsights,
-  subscriptionCount: number
+  subscriptionCount: number,
+  month: DashboardMonthContext
 ): DashboardAttentionItem[] {
   const items: DashboardAttentionItem[] = [];
+  const monthBounds = { from: month.from, to: month.to };
+  const monthRef = monthReferenceDate(month.year, month.month);
 
   if (personal.uncategorizedCount > 0) {
     items.push({
@@ -241,7 +288,10 @@ function buildAttentionItems(
       title: "Uncategorized transactions",
       description: "Add categories so spending insights stay accurate.",
       count: personal.uncategorizedCount,
-      href: "/transactions?scope=personal",
+      href: buildTransactionsFilterLink(
+        { scope: "personal", direction: "expense", category: "uncategorized" },
+        monthBounds
+      ),
     });
   }
 
@@ -255,7 +305,7 @@ function buildAttentionItems(
           ? `${top.categoryName} is a bit higher than your usual pattern this month.`
           : "A few categories are a bit higher than your usual pattern this month.",
       count: spendingInsights.worthALook.length,
-      href: buildPersonalSpendingCategoryLink(top.categoryId),
+      href: buildPersonalSpendingCategoryLink(top.categoryId, monthRef),
     });
   }
 
@@ -266,7 +316,10 @@ function buildAttentionItems(
       description:
         "Recurring service charges you may want to keep, change, or cancel.",
       count: subscriptionCount,
-      href: "/transactions?scope=personal&direction=expense",
+      href: buildTransactionsFilterLink(
+        { scope: "personal", direction: "expense" },
+        monthBounds
+      ),
     });
   }
 
@@ -307,10 +360,31 @@ export function buildDashboardData(input: {
   planningPlans: PlanningPlan[];
   spaceContext: DashboardSpaceContext;
   budgetSnapshot: DashboardBudgetSnapshot;
+  month: DashboardMonthContext;
 }): DashboardData {
-  const personal = buildPersonalMetrics(input.transactions);
-  const recurring = detectRecurringPayments(input.transactions);
-  const spendingInsights = detectSpendingInsights(input.transactions);
+  const { month } = input;
+  const monthRef = monthReferenceDate(month.year, month.month);
+  const personal = buildPersonalMetrics(
+    input.transactions,
+    month,
+    input.financeMode
+  );
+  const recurringAll = detectRecurringPayments(input.transactions);
+  const recurring = filterRecurringForMonth(
+    recurringAll,
+    input.transactions,
+    month.year,
+    month.month
+  );
+  const spendingInsights = detectSpendingInsights(input.transactions, monthRef);
+  const hasAnyTransactions =
+    !input.spaceContext.isShared &&
+    input.transactions.some((tx) => !tx.is_business);
+  const hasMonthActivity = hasPersonalActivityInMonth(
+    input.transactions,
+    month.year,
+    month.month
+  );
   const { isShared } = input.spaceContext;
   const showBusiness =
     !isShared && showsBusinessFeatures(input.financeMode);
@@ -340,13 +414,17 @@ export function buildDashboardData(input: {
         business,
         input.taxYearId,
         spendingInsights,
-        recurring.subscriptionsToReview.length
+        recurring.subscriptionsToReview.length,
+        month
       );
 
   return {
     financeMode: input.financeMode,
     currency: input.currency,
-    hasTransactions: !isShared && input.transactions.length > 0,
+    month,
+    hasAnyTransactions,
+    hasMonthActivity,
+    hasTransactions: hasAnyTransactions,
     personal,
     business,
     goals: input.goals,

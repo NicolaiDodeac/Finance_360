@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, Upload } from "lucide-react";
+import { Plus, Sparkles, Upload } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { TransactionCreateDrawer } from "@/components/transactions/transaction-create-drawer";
@@ -20,6 +20,7 @@ import {
   evaluateManyTransactions,
   toEvidenceInput,
 } from "@/lib/evidence";
+import { CATEGORISE_ASSISTANT_PATH } from "@/lib/transactions/links";
 import type { TransactionWithRelations } from "@/lib/transactions/types";
 
 interface TransactionsViewProps {
@@ -29,6 +30,7 @@ interface TransactionsViewProps {
   hmrcCategories: HmrcCategoryRow[];
   taxYears: TaxYearRow[];
   unmatchedReceipts: ReceiptWithRelations[];
+  uncategorisedCount: number;
   loadError?: string | null;
 }
 
@@ -39,6 +41,7 @@ export function TransactionsView({
   hmrcCategories,
   taxYears,
   unmatchedReceipts,
+  uncategorisedCount,
   loadError,
 }: TransactionsViewProps) {
   const searchParams = useSearchParams();
@@ -95,6 +98,27 @@ export function TransactionsView({
           {saveNotice}
         </p>
       ) : null}
+
+      {uncategorisedCount > 0 && (
+        <div className="mb-4 flex flex-col gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="font-medium">
+              {uncategorisedCount} uncategorised transaction
+              {uncategorisedCount === 1 ? "" : "s"}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Answer simple questions — we map categories and HMRC behind the
+              scenes.
+            </p>
+          </div>
+          <Button type="button" variant="secondary" asChild className="shrink-0">
+            <Link href={CATEGORISE_ASSISTANT_PATH}>
+              <Sparkles className="h-4 w-4" />
+              Business categorisation
+            </Link>
+          </Button>
+        </div>
+      )}
 
       <div className="mb-6">
         <TransactionFilters categories={categories} taxYears={taxYears} />

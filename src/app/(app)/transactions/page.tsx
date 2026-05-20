@@ -11,6 +11,7 @@ import {
   parseTransactionSearchParams,
   type TransactionSearchParams,
 } from "@/lib/transactions/filters";
+import { getUncategorisedTransactionCount } from "@/lib/categorization/assistant-queries";
 import { getTransactions } from "@/lib/transactions/queries";
 
 interface TransactionsPageProps {
@@ -32,17 +33,26 @@ async function TransactionsContent({
   let hmrcCategories: Awaited<ReturnType<typeof getHmrcCategories>> = [];
   let taxYears: Awaited<ReturnType<typeof getTaxYears>> = [];
   let unmatchedReceipts: Awaited<ReturnType<typeof getUnmatchedReceipts>> = [];
+  let uncategorisedCount = 0;
 
   try {
-    [accounts, categories, hmrcCategories, taxYears, transactions, unmatchedReceipts] =
-      await Promise.all([
-        getAccounts(user.id),
-        getCategories(user.id),
-        getHmrcCategories(),
-        getTaxYears(user.id),
-        getTransactions(user.id, filters),
-        getUnmatchedReceipts(user.id),
-      ]);
+    [
+      accounts,
+      categories,
+      hmrcCategories,
+      taxYears,
+      transactions,
+      unmatchedReceipts,
+      uncategorisedCount,
+    ] = await Promise.all([
+      getAccounts(user.id),
+      getCategories(user.id),
+      getHmrcCategories(),
+      getTaxYears(user.id),
+      getTransactions(user.id, filters),
+      getUnmatchedReceipts(user.id),
+      getUncategorisedTransactionCount(user.id),
+    ]);
   } catch (err) {
     loadError =
       err instanceof Error ? err.message : "Failed to load transactions.";
@@ -56,6 +66,7 @@ async function TransactionsContent({
       hmrcCategories={hmrcCategories}
       taxYears={taxYears}
       unmatchedReceipts={unmatchedReceipts}
+      uncategorisedCount={uncategorisedCount}
       loadError={loadError}
     />
   );

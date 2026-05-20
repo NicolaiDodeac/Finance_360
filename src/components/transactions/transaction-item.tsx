@@ -8,6 +8,10 @@ import {
   signedAmount,
 } from "@/lib/transactions/format";
 import {
+  getFlowTypeBadgeLabel,
+  getInsightExclusionLabel,
+} from "@/lib/transactions/classification";
+import {
   getAppliedRuleName,
   isUncategorized,
   needsHmrcCategory,
@@ -30,6 +34,8 @@ export function TransactionItem({
   const uncategorized = isUncategorized(transaction);
   const missingHmrc = needsHmrcCategory(transaction);
   const appliedRuleName = getAppliedRuleName(transaction);
+  const insightExclusionLabel = getInsightExclusionLabel(transaction);
+  const flowTypeLabel = getFlowTypeBadgeLabel(transaction);
   const signed = signedAmount(
     Number(transaction.amount),
     transaction.direction
@@ -69,6 +75,17 @@ export function TransactionItem({
           {appliedRuleName && (
             <Badge variant="secondary" title="Category assigned by your rule">
               Auto
+            </Badge>
+          )}
+          {flowTypeLabel && flowTypeLabel !== "Business" && (
+            <Badge variant="secondary" title="How this affects your insights">
+              {flowTypeLabel}
+            </Badge>
+          )}
+          {insightExclusionLabel &&
+            insightExclusionLabel !== flowTypeLabel && (
+            <Badge variant="secondary" title="Not included in income or spending insights">
+              {insightExclusionLabel}
             </Badge>
           )}
           {evidence ? (

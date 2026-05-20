@@ -1,11 +1,11 @@
 import {
   buildBudgetPageData,
   buildDashboardBudgetSnapshot,
-  getCurrentPeriod,
 } from "@/lib/budget/calculations";
 import { getBudgetForPeriod } from "@/lib/budget/queries";
 import { getCategories } from "@/lib/categories/queries";
 import { buildDashboardData } from "@/lib/dashboard/calculations";
+import { parseMonthParam } from "@/lib/dashboard/month-context";
 import type { DashboardData } from "@/lib/dashboard/types";
 import { getActiveSavingsGoals } from "@/lib/goals/queries";
 import { getPlanningPreview } from "@/lib/planning/queries";
@@ -15,11 +15,19 @@ import { getActiveSpaceContext } from "@/lib/spaces/queries";
 import { getTaxHubData } from "@/lib/tax/queries";
 import { getTransactions } from "@/lib/transactions/queries";
 
-export async function getDashboardData(userId: string): Promise<DashboardData> {
+export async function getDashboardData(
+  userId: string,
+  monthParam?: string
+): Promise<DashboardData> {
   const profile = await ensureProfile(userId);
   const spaceContext = await getActiveSpaceContext(userId);
   const { space, isShared } = spaceContext;
-  const period = getCurrentPeriod();
+  const month = parseMonthParam(monthParam);
+  const period = {
+    year: month.year,
+    month: month.month,
+    label: month.label,
+  };
 
   const [transactions, goals, planningPlans, categories, budgetData] =
     await Promise.all([
@@ -32,6 +40,7 @@ export async function getDashboardData(userId: string): Promise<DashboardData> {
 
   const budgetPageSlice = buildBudgetPageData({
     period,
+    month,
     budget: budgetData.budget,
     budgetItems: budgetData.items,
     categories,
@@ -66,5 +75,6 @@ export async function getDashboardData(userId: string): Promise<DashboardData> {
     planningPlans,
     spaceContext: { space, isShared },
     budgetSnapshot,
+    month,
   });
 }

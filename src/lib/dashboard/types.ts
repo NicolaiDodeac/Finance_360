@@ -4,6 +4,7 @@ import type { SavingsGoalRow } from "@/lib/goals/types";
 import type { PlanningPlan } from "@/lib/planning/types";
 import type { DashboardBudgetSnapshot } from "@/lib/budget/types";
 import type { UserSpace } from "@/lib/spaces/types";
+import type { DashboardMonthContext } from "@/lib/dashboard/month-context";
 import type { RecurringInsights } from "@/lib/dashboard/recurring";
 import type { SpendingInsights } from "@/lib/dashboard/spending-insights";
 
@@ -21,11 +22,25 @@ export interface DashboardMonthlyCashflow {
   net: number;
 }
 
+export interface DashboardMoneyFlow {
+  /** Personal income (always populated). */
+  income: number;
+  personalSpending: number;
+  businessIncome: number;
+  businessExpenses: number;
+  savedOrInvested: number;
+  debtRepaid: number;
+  taxPaid: number;
+  transfersExcluded: number;
+  showBusinessBreakdown: boolean;
+}
+
 export interface DashboardPersonalMetrics {
   moneyIn: number;
   moneyOut: number;
   netCashflow: number;
   savingsRatePercent: number | null;
+  moneyFlow: DashboardMoneyFlow;
   topSpendingCategory: DashboardCategorySpend | null;
   reviewRecommendedCount: number;
   uncategorizedCount: number;
@@ -61,6 +76,12 @@ export interface DashboardSpaceContext {
 export interface DashboardData {
   financeMode: FinanceMode;
   currency: string;
+  month: DashboardMonthContext;
+  /** User has imported transactions at any time. */
+  hasAnyTransactions: boolean;
+  /** Personal activity exists in the selected month. */
+  hasMonthActivity: boolean;
+  /** @deprecated Use hasAnyTransactions — kept for gradual migration. */
   hasTransactions: boolean;
   personal: DashboardPersonalMetrics;
   business: DashboardBusinessSnapshot | null;

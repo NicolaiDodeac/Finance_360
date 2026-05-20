@@ -1,6 +1,7 @@
 import type { CategoryRow } from "@/lib/categories/queries";
 import { getCategoryOptionLabel } from "@/lib/categories/display";
 import type { SavingsGoalRow } from "@/lib/goals/types";
+import type { DashboardMonthContext } from "@/lib/dashboard/month-context";
 import type {
   BudgetCashflowSummary,
   BudgetItemRow,
@@ -13,6 +14,10 @@ import type {
   BudgetSummary,
   DashboardBudgetSnapshot,
 } from "@/lib/budget/types";
+import {
+  shouldCountAsIncome,
+  shouldCountInBudget,
+} from "@/lib/transactions/classification";
 import type { TransactionWithRelations } from "@/lib/transactions/types";
 
 const DEFAULT_WARNING_THRESHOLD = 0.85;
@@ -83,8 +88,13 @@ function sumByDirection(
   rows: TransactionWithRelations[],
   direction: "income" | "expense"
 ): number {
+  if (direction === "income") {
+    return rows
+      .filter(shouldCountAsIncome)
+      .reduce((sum, tx) => sum + Number(tx.amount), 0);
+  }
   return rows
-    .filter((tx) => tx.direction === direction)
+    .filter((tx) => !tx.is_business && tx.direction === "expense")
     .reduce((sum, tx) => sum + Number(tx.amount), 0);
 }
 
@@ -96,7 +106,7 @@ function buildActualsByCategory(
   const map = new Map<string, number>();
 
   for (const tx of transactions) {
-    if (tx.is_business || tx.direction !== "expense") continue;
+    if (!shouldCountInBudget(tx)) continue;
     if (!isInMonth(tx.transaction_date, year, month)) continue;
     if (!tx.category_id) continue;
 
@@ -220,6 +230,7 @@ function buildSavingsSummary(goals: SavingsGoalRow[]): BudgetSavingsSummary {
 
 export function buildBudgetPageData(input: {
   period: BudgetPeriod;
+  month: DashboardMonthContext;
   budget: BudgetRow | null;
   budgetItems: BudgetItemRow[];
   categories: CategoryRow[];
@@ -244,6 +255,7 @@ export function buildBudgetPageData(input: {
 
   return {
     period,
+    month: input.month,
     budget,
     items,
     summary,

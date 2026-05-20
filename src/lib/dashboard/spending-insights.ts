@@ -1,3 +1,4 @@
+import { shouldCountInLifestyleSpending } from "@/lib/transactions/classification";
 import type { TransactionWithRelations } from "@/lib/transactions/types";
 
 export interface CategorySpendingInsight {
@@ -17,7 +18,7 @@ const SPIKE_RATIO_THRESHOLD = 1.25;
 const MIN_DIFFERENCE_GBP = 25;
 
 function isPersonalExpense(tx: TransactionWithRelations): boolean {
-  return !tx.is_business && tx.direction === "expense";
+  return shouldCountInLifestyleSpending(tx);
 }
 
 function isInMonth(isoDate: string, year: number, month: number): boolean {

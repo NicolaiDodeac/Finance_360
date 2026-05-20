@@ -23,6 +23,7 @@ const TAX_YEAR_INCOME_SELECT = `
   merchant_name,
   notes,
   account_id,
+  raw_import_data,
   hmrc_category:hmrc_categories(id, code, name, is_allowable_expense)
 `;
 

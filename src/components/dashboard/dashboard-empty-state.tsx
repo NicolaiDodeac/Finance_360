@@ -9,6 +9,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
+export function DashboardMonthEmptyState({ monthLabel }: { monthLabel: string }) {
+  return (
+    <p className="rounded-lg border border-dashed px-4 py-3 text-center text-sm text-muted-foreground">
+      No activity recorded for {monthLabel} yet.
+    </p>
+  );
+}
+
 export function DashboardEmptyState() {
   return (
     <Card className="border-primary/20 bg-gradient-to-br from-primary/5 via-background to-background">

@@ -12,6 +12,9 @@ import {
 } from "@/lib/categorization/apply-batch";
 import { incrementRulesTimesMatched } from "@/lib/categorization/increment";
 import { getCategorizationRules } from "@/lib/categorization/queries";
+import { getCategories } from "@/lib/categories/queries";
+import { buildImportPreviewGroups } from "@/lib/import/preview-groups";
+import type { ImportPreviewMerchantGroup } from "@/lib/import/preview-groups";
 import { parseImportFile } from "@/lib/import/parse";
 import { getExistingTransactionsForImport } from "@/lib/import/queries";
 import type {
@@ -26,6 +29,8 @@ import type { ActionResult } from "@/lib/transactions/types";
 
 export interface ParseImportPreviewResult extends ParseImportFileResult {
   preview_rows: ImportPreviewRow[];
+  preview_groups: ImportPreviewMerchantGroup[];
+  uncategorised_new_count: number;
   account_id: string;
 }
 
@@ -51,7 +56,10 @@ export async function parseImportPreview(
   try {
     const buffer = Buffer.from(await file.arrayBuffer());
     const parsed = await parseImportFile(file.name, buffer, file.type);
-    const rules = await getCategorizationRules(user.id, { activeOnly: true });
+    const [rules, categories] = await Promise.all([
+      getCategorizationRules(user.id, { activeOnly: true }),
+      getCategories(user.id),
+    ]);
 
     const categorizedTransactions = parsed.transactions.map((tx) => {
       const fields = applyRulesToImportRow(
@@ -60,7 +68,8 @@ export async function parseImportPreview(
           merchant_name: tx.merchant_name,
         },
         rules,
-        tx.raw_import_data
+        tx.raw_import_data,
+        { direction: tx.direction, categories }
       );
 
       return {
@@ -100,12 +109,22 @@ export async function parseImportPreview(
       accountId
     );
 
+    const newRows = preview_rows.filter((r) => r.status === "new");
+    const uncategorised_new_count = newRows.filter((r) => !r.category_id).length;
+    const preview_groups = buildImportPreviewGroups(
+      preview_rows,
+      categories,
+      rules
+    );
+
     return {
       success: true,
       data: {
         ...parsed,
         transactions: categorizedTransactions,
         preview_rows,
+        preview_groups,
+        uncategorised_new_count,
         account_id: accountId,
       },
     };
@@ -162,7 +181,10 @@ export async function importTransactions(
     };
   }
 
-  const rules = await getCategorizationRules(user.id, { activeOnly: true });
+  const [rules, categories] = await Promise.all([
+    getCategorizationRules(user.id, { activeOnly: true }),
+    getCategories(user.id),
+  ]);
   const taxYears = await getTaxYears(user.id);
   const supabase = await createClient();
 
@@ -179,7 +201,8 @@ export async function importTransactions(
         import_file: input.file_name,
         import_key: row.import_key,
         imported_at: new Date().toISOString(),
-      }
+      },
+      { direction: row.direction, categories }
     );
 
     return {
@@ -220,6 +243,8 @@ export async function importTransactions(
 
   revalidatePath("/transactions");
   revalidatePath("/transactions/import");
+  revalidatePath("/transactions/categorise");
+  revalidatePath("/dashboard");
 
   return {
     success: true,
