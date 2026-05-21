@@ -1,9 +1,9 @@
-import { Suspense } from "react";
 import { PageHeader } from "@/components/shared/page-header";
 import { BudgetView } from "@/components/budget/budget-view";
-import { DashboardMonthSwitcher } from "@/components/dashboard/dashboard-month-switcher";
+import { MonthSwitcherSection } from "@/components/dashboard/month-switcher-section";
 import { requireAuth } from "@/lib/auth/helpers";
 import { getBudgetPageData } from "@/lib/budget/queries";
+import { parseMonthParam } from "@/lib/dashboard/month-context";
 import { getCategories } from "@/lib/categories/queries";
 import { getSelectableCategories } from "@/lib/categories/display";
 import { getActiveSpaceContext } from "@/lib/spaces/queries";
@@ -15,16 +15,9 @@ interface BudgetPageProps {
   }>;
 }
 
-function MonthSwitcherFallback() {
-  return (
-    <div className="flex h-9 items-center justify-center" aria-hidden>
-      <span className="sr-only">Loading month</span>
-    </div>
-  );
-}
-
 export default async function BudgetPage({ searchParams }: BudgetPageProps) {
   const { month: monthParam } = await searchParams;
+  const month = parseMonthParam(monthParam);
   const user = await requireAuth();
   const { space, isShared } = await getActiveSpaceContext(user.id);
 
@@ -37,6 +30,8 @@ export default async function BudgetPage({ searchParams }: BudgetPageProps) {
     loadError =
       err instanceof Error ? err.message : "Failed to load your monthly plan.";
   }
+
+  const monthContext = data?.month ?? month;
 
   const allCategories = await getCategories(user.id);
   const expensesParent = allCategories.find((c) => c.slug === "expenses");
@@ -55,14 +50,10 @@ export default async function BudgetPage({ searchParams }: BudgetPageProps) {
             ? "A calm monthly plan for your household — awareness over restriction."
             : "Guide your spending with a flexible monthly plan — no guilt, just clarity."
         }
+        action={
+          <MonthSwitcherSection month={monthContext} ariaLabel="Budget month" />
+        }
       />
-      {data ? (
-        <div className="mb-6">
-          <Suspense fallback={<MonthSwitcherFallback />}>
-            <DashboardMonthSwitcher month={data.month} ariaLabel="Budget month" />
-          </Suspense>
-        </div>
-      ) : null}
       {loadError ? (
         <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
           {loadError}
