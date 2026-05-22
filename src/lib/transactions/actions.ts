@@ -286,3 +286,47 @@ export async function updateTransaction(
     data: { similarUpdatedCount: retroactive.updatedCount },
   };
 }
+
+export async function deleteTransaction(
+  transactionId: string
+): Promise<ActionResult> {
+  const user = await requireAuth();
+  const supabase = await createClient();
+
+  const { data: existing, error: fetchError } = await supabase
+    .from("transactions")
+    .select("id, receipt_id")
+    .eq("id", transactionId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (fetchError || !existing) {
+    return { success: false, error: "Transaction not found." };
+  }
+
+  const receiptId = existing.receipt_id as string | null;
+
+  const { error } = await supabase
+    .from("transactions")
+    .delete()
+    .eq("id", transactionId)
+    .eq("user_id", user.id);
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  if (receiptId) {
+    await supabase
+      .from("receipts")
+      .update({ status: "ready" })
+      .eq("id", receiptId)
+      .eq("user_id", user.id);
+  }
+
+  revalidatePath("/transactions");
+  revalidatePath("/receipts");
+  revalidatePath("/dashboard");
+  revalidatePath("/tax");
+  return { success: true };
+}

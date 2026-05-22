@@ -476,48 +476,60 @@ export function BusinessMerchantGroupCard({
         )}
 
         {showConfirm && resolved && reviewChoiceId && (
-          <div className="space-y-4">
-            <StepReview
-              choiceId={reviewChoiceId}
-              direction={group.direction}
-              resolved={resolved}
-              hmrcCategories={hmrcCategories}
-              businessUsePercent={businessUsePercent}
-              onBusinessUsePercentChange={setBusinessUsePercent}
-              hmrcOverrideId={hmrcOverrideId}
-              onHmrcOverrideChange={setHmrcOverrideId}
-              prefillReason={prefillReason}
-              disabled={disabled || isPending}
-            />
-            <RememberSection
-              merchantLabel={group.merchantLabel}
-              rememberEnabled={rememberEnabled}
-              onRememberChange={(on) => {
-                setRememberEnabled(on);
-                setRuleScope(on ? "future_similar" : "group_only");
-              }}
-              ruleScope={ruleScope}
-              onRuleScopeChange={(scope) => {
-                setRuleScope(scope);
-                if (scope === "transaction_only") setRememberEnabled(false);
-                if (scope === "future_similar") setRememberEnabled(true);
-              }}
-              isAmbiguous={ambiguous}
-              disabled={disabled || isPending}
-            />
-            <p className="text-xs text-muted-foreground">{FLOW_COPY.changeLater}</p>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="px-0"
-              onClick={() =>
-                isIncome ? setIncomeStep(1) : setExpenseStep(2)
-              }
-            >
-              ← {isIncome ? "Change income type" : "Change category"}
-            </Button>
-          </div>
+          <StepReview
+            choiceId={reviewChoiceId}
+            direction={group.direction}
+            resolved={resolved}
+            hmrcCategories={hmrcCategories}
+            businessUsePercent={businessUsePercent}
+            onBusinessUsePercentChange={setBusinessUsePercent}
+            hmrcOverrideId={hmrcOverrideId}
+            onHmrcOverrideChange={setHmrcOverrideId}
+            prefillReason={prefillReason}
+            disabled={disabled || isPending}
+            merchantLabel={group.merchantLabel}
+            amountLabel={formatMoney(group.totalAmount)}
+            suggestion={group.suggestion}
+            purpose={purpose ?? resolved.purpose}
+            onConfirm={handleConfirm}
+            confirmLabel={
+              isPending
+                ? "Applying…"
+                : `Confirm for ${group.transactionCount} transaction${group.transactionCount === 1 ? "" : "s"}`
+            }
+            isPending={isPending}
+            rememberPanel={
+              <RememberSection
+                merchantLabel={group.merchantLabel}
+                rememberEnabled={rememberEnabled}
+                onRememberChange={(on) => {
+                  setRememberEnabled(on);
+                  setRuleScope(on ? "future_similar" : "group_only");
+                }}
+                ruleScope={ruleScope}
+                onRuleScopeChange={(scope) => {
+                  setRuleScope(scope);
+                  if (scope === "transaction_only") setRememberEnabled(false);
+                  if (scope === "future_similar") setRememberEnabled(true);
+                }}
+                isAmbiguous={ambiguous}
+                disabled={disabled || isPending}
+              />
+            }
+            changePanel={
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="px-0"
+                onClick={() =>
+                  isIncome ? setIncomeStep(1) : setExpenseStep(2)
+                }
+              >
+                ← {isIncome ? "Change income type" : "Change category"}
+              </Button>
+            }
+          />
         )}
 
         {error && (
@@ -526,18 +538,6 @@ export function BusinessMerchantGroupCard({
       </CardContent>
 
       <div className="flex flex-col gap-2 border-t border-border bg-muted/20 p-4 sm:p-6">
-        {showConfirm && (
-          <Button
-            type="button"
-            disabled={disabled || isPending || !resolved}
-            onClick={handleConfirm}
-            className="h-12 w-full text-base"
-          >
-            {isPending
-              ? "Applying…"
-              : `Confirm for ${group.transactionCount} transaction${group.transactionCount === 1 ? "" : "s"}`}
-          </Button>
-        )}
         <Button
           type="button"
           variant="ghost"

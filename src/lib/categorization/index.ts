@@ -50,3 +50,13 @@ export {
   ruleFormFromTransaction,
   ruleToFormInput,
 } from "@/lib/categorization/rule-form";
+
+export {
+  suggestWithMerchantMemory,
+  MERCHANT_MEMORY_CONFIRM_THRESHOLD,
+} from "@/lib/categorization/merchant-memory";
+
+export {
+  buildMerchantMemoryIndex,
+  lookupMerchantMemory,
+} from "@/lib/categorization/merchant-memory-index";

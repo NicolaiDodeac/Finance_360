@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "check:hmrc": "npx --yes tsx scripts/run-hmrc-assertions.ts"
+    "check:hmrc": "npx --yes tsx scripts/run-hmrc-assertions.ts",
+    "check:receipt-match": "npx --yes tsx scripts/run-receipt-match-assertions.ts",
+    "check:receipt-ocr": "npx --yes tsx scripts/run-receipt-ocr-assertions.ts"
   },
   "dependencies": {
     "@napi-rs/canvas": "^0.1.80",
@@ -28,6 +30,7 @@
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "recharts": "^3.6.0",
+    "sharp": "^0.34.5",
     "tailwind-merge": "^3.4.0",
     "tesseract.js": "^5.1.1"
   },

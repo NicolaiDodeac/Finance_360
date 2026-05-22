@@ -8,31 +8,53 @@ import type { ReceiptWithRelations } from "@/lib/receipts/types";
 
 interface ReceiptListItemProps {
   receipt: ReceiptWithRelations;
-  onSelect: (receipt: ReceiptWithRelations) => void;
+  onSelect?: (receipt: ReceiptWithRelations) => void;
+  onClick?: () => void;
+  badge?: string;
 }
 
-export function ReceiptListItem({ receipt, onSelect }: ReceiptListItemProps) {
+export function ReceiptListItem({
+  receipt,
+  onSelect,
+  onClick,
+  badge,
+}: ReceiptListItemProps) {
   const attached = receipt.attached_transaction;
   const displayName =
     receipt.merchant_name ||
     receipt.original_filename ||
     "Stored receipt";
 
+  const statusBadge =
+    badge ??
+    (attached ? "Linked" : (receipt as { status?: string }).status === "needs_review" ? "Needs review" : "Unmatched");
+
+  const handleClick = () => {
+    if (onClick) onClick();
+    else onSelect?.(receipt);
+  };
+
   return (
     <button
       type="button"
-      onClick={() => onSelect(receipt)}
+      onClick={handleClick}
       className="flex w-full gap-3 rounded-xl border border-border bg-card px-4 py-3 text-left transition-colors hover:bg-muted/40"
     >
       <ReceiptFileIcon mimeType={receipt.mime_type} />
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex flex-wrap items-center gap-2">
           <p className="truncate font-medium text-foreground">{displayName}</p>
-          {attached ? (
-            <Badge variant="business">Linked</Badge>
-          ) : (
-            <Badge variant="warning">Unmatched</Badge>
-          )}
+          <Badge
+            variant={
+              statusBadge === "Linked"
+                ? "business"
+                : statusBadge === "Needs review"
+                  ? "warning"
+                  : "warning"
+            }
+          >
+            {statusBadge}
+          </Badge>
         </div>
         <p className="text-sm text-muted-foreground">
           {receipt.total_amount !== null

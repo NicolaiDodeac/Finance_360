@@ -1,13 +1,20 @@
+import { extractMerchantFromReceiptText } from "@/lib/receipts/ocr/extract-merchant";
+import { parseMoneyAmount } from "@/lib/receipts/ocr/parse-amount";
 import type { ReceiptPaymentMethod } from "@/types/database";
 import type { ReceiptOcrExtraction } from "@/lib/receipts/ocr/types";
 
-const TOTAL_LABELS =
-  /(?:^|\n)\s*(?:total(?:\s+due)?|amount\s+due|grand\s+total|balance\s+due|you\s+paid)\s*[:\s]*[£$]?\s*([\d,]+\.?\d*)/im;
+/** Final total line — not subtotal/savings (Tesco prints both). */
+const TOTAL_LABELS = [
+  /(?:^|\n)\s*total\s*[:\s]*[£$]?\s*([\d.,]+)/im,
+  /(?:^|\n)\s*(?:amount\s+due|grand\s+total|balance\s+due|you\s+paid)\s*[:\s]*[£$]?\s*([\d.,]+)/im,
+  /(?:^|\n)\s*card\s*[:\s]*[£$]?\s*([\d.,]+)/im,
+];
 
 const VAT_LABELS =
-  /(?:vat|v\.a\.t\.?)\s*(?:@?\s*\d+%?)?\s*[:\s]*[£$]?\s*([\d,]+\.?\d*)/im;
+  /(?:vat|v\.a\.t\.?)\s*(?:@?\s*\d+%?)?\s*[:\s]*[£$]?\s*([\d.,]+)/im;
 
-const CURRENCY_AMOUNT = /[£$]\s*([\d,]+\.\d{2})\b/g;
+const CURRENCY_AMOUNT =
+  /[£$]\s*([\d,]+[.,]\d{1,2})\b|[£$]\s*([\d,]+\.\d{2})\b|(?:^|\s)([\d,]+[.,]\d{1,2})(?:\s|$)/g;
 
 const UK_DATE_PATTERNS = [
   /\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})\b/g,
@@ -27,16 +34,6 @@ const PAYMENT_PATTERNS: Array<{
   },
 ];
 
-const MERCHANT_SKIP =
-  /^(receipt|invoice|tax|vat|total|subtotal|thank|welcome|tel|phone|www\.|http|date|time|qty|item)/i;
-
-function parseAmount(raw: string): number | null {
-  const cleaned = raw.replace(/,/g, "");
-  const num = Number(cleaned);
-  if (!Number.isFinite(num) || num < 0) return null;
-  return Math.round(num * 100) / 100;
-}
-
 function toIsoDate(day: number, month: number, year: number): string | null {
   const y = year < 100 ? 2000 + year : year;
   if (month < 1 || month > 12 || day < 1 || day > 31) return null;
@@ -47,6 +44,18 @@ function toIsoDate(day: number, month: number, year: number): string | null {
 }
 
 function extractDate(text: string): string | null {
+  const withTime =
+    /\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})\s+\d{1,2}:\d{2}/.exec(text);
+  if (withTime) {
+    let d = Number(withTime[1]);
+    let m = Number(withTime[2]);
+    let y = Number(withTime[3]);
+    if (y < 100) y += 2000;
+    if (m > 12 && d <= 12) [d, m] = [m, d];
+    const iso = toIsoDate(d, m, y);
+    if (iso) return iso;
+  }
+
   for (const pattern of UK_DATE_PATTERNS) {
     pattern.lastIndex = 0;
     let match: RegExpExecArray | null;
@@ -96,28 +105,42 @@ function extractDate(text: string): string | null {
 }
 
 function extractTotal(text: string): number | null {
-  const labelMatch = text.match(TOTAL_LABELS);
-  if (labelMatch?.[1]) {
-    const parsed = parseAmount(labelMatch[1]);
-    if (parsed !== null) return parsed;
+  for (const pattern of TOTAL_LABELS) {
+    const labelMatch = text.match(pattern);
+    if (labelMatch?.[1]) {
+      const parsed = parseMoneyAmount(labelMatch[1]);
+      if (parsed !== null) return parsed;
+    }
   }
 
   const amounts: number[] = [];
   let match: RegExpExecArray | null;
   const re = new RegExp(CURRENCY_AMOUNT.source, CURRENCY_AMOUNT.flags);
   while ((match = re.exec(text)) !== null) {
-    const parsed = parseAmount(match[1]);
+    const raw = match[1] ?? match[2] ?? match[3];
+    if (!raw) continue;
+    const parsed = parseMoneyAmount(raw);
     if (parsed !== null) amounts.push(parsed);
   }
 
   if (amounts.length === 0) return null;
+
+  const subtotalMatch = /subtotal\s*[:\s]*[£$]?\s*([\d.,]+)/i.exec(text);
+  if (subtotalMatch?.[1]) {
+    const subtotal = parseMoneyAmount(subtotalMatch[1]);
+    const belowSubtotal = amounts.filter((a) => subtotal === null || a <= subtotal);
+    if (belowSubtotal.length > 0) {
+      return Math.max(...belowSubtotal);
+    }
+  }
+
   return Math.max(...amounts);
 }
 
 function extractVat(text: string): number | null {
   const match = text.match(VAT_LABELS);
   if (match?.[1]) {
-    return parseAmount(match[1]);
+    return parseMoneyAmount(match[1]);
   }
   return null;
 }
@@ -125,20 +148,6 @@ function extractVat(text: string): number | null {
 function extractPaymentMethod(text: string): ReceiptPaymentMethod | null {
   for (const { method, pattern } of PAYMENT_PATTERNS) {
     if (pattern.test(text)) return method;
-  }
-  return null;
-}
-
-function extractMerchant(text: string): string | null {
-  const lines = text
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter((l) => l.length >= 2 && l.length <= 80);
-
-  for (const line of lines.slice(0, 12)) {
-    if (MERCHANT_SKIP.test(line)) continue;
-    if (/^[\d£$.,\s%-]+$/.test(line)) continue;
-    if (line.length >= 3) return line;
   }
   return null;
 }
@@ -166,6 +175,8 @@ export function parseReceiptText(text: string): ReceiptOcrExtraction {
   if (!normalized) {
     return {
       merchant: null,
+      merchantSource: "unknown",
+      knownMerchantId: null,
       receiptDate: null,
       totalAmount: null,
       vatAmount: null,
@@ -176,8 +187,12 @@ export function parseReceiptText(text: string): ReceiptOcrExtraction {
     };
   }
 
+  const merchantResult = extractMerchantFromReceiptText(normalized);
+
   const base = {
-    merchant: extractMerchant(normalized),
+    merchant: merchantResult.merchant,
+    merchantSource: merchantResult.source,
+    knownMerchantId: merchantResult.knownMerchantId,
     receiptDate: extractDate(normalized),
     totalAmount: extractTotal(normalized),
     vatAmount: extractVat(normalized),

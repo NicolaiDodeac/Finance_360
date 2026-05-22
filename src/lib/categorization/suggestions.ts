@@ -109,6 +109,19 @@ const PATTERN_RULES: PatternRule[] = [
     reason: "Supermarket",
   },
   {
+    test: (key, dir) =>
+      dir === "expense" &&
+      (key.includes("SHELL") ||
+        key.includes(" BP ") ||
+        key.startsWith("BP ") ||
+        key.includes("ESSO") ||
+        key.includes("TEXACO")),
+    categorySlug: "fuel",
+    confidence: "medium",
+    reason: "Fuel station — confirm if business or personal",
+    isBusiness: false,
+  },
+  {
     test: (key) => key.includes("MONEYBOX"),
     categorySlug: "savings-transfer",
     confidence: "high",

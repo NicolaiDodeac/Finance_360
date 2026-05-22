@@ -9,10 +9,12 @@ import { getCategories } from "@/lib/categories/queries";
 import { ensureDefaultCategories } from "@/lib/setup/categories";
 import { getCategorizationRules } from "@/lib/categorization/queries";
 import {
+  getCategorisedTransactionsForMemory,
   getReviewDeferredTransactionCount,
   getUncategorisedTransactionsForAssistant,
 } from "@/lib/categorization/assistant-queries";
 import { buildMerchantGroups } from "@/lib/categorization/groups";
+import { buildMerchantMemoryIndex } from "@/lib/categorization/merchant-memory-index";
 import { getHmrcCategories } from "@/lib/hmrc/queries";
 
 export default async function CategoriseTransactionsPage() {
@@ -20,16 +22,23 @@ export default async function CategoriseTransactionsPage() {
 
   await ensureDefaultCategories(user.id);
 
-  const [transactions, categories, hmrcCategories, rules, reviewDeferredCount] =
+  const [transactions, categories, hmrcCategories, rules, reviewDeferredCount, memoryRows] =
     await Promise.all([
       getUncategorisedTransactionsForAssistant(user.id),
       getCategories(user.id),
       getHmrcCategories(),
       getCategorizationRules(user.id, { activeOnly: true }),
       getReviewDeferredTransactionCount(user.id),
+      getCategorisedTransactionsForMemory(user.id),
     ]);
 
-  const groups = buildMerchantGroups(transactions, categories, rules);
+  const memoryIndex = buildMerchantMemoryIndex(memoryRows);
+  const groups = buildMerchantGroups(
+    transactions,
+    categories,
+    rules,
+    memoryIndex
+  );
 
   return (
     <>

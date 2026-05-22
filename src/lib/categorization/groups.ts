@@ -9,7 +9,11 @@ import {
   inferGroupMatchKeyword,
   merchantGroupDisplayLabel,
 } from "@/lib/categorization/normalize";
-import { suggestCategoryForGroup } from "@/lib/categorization/suggestions";
+import {
+  lookupMerchantMemory,
+  type MerchantMemoryIndex,
+} from "@/lib/categorization/merchant-memory-index";
+import { suggestWithMerchantMemory } from "@/lib/categorization/merchant-memory";
 import type {
   AssistantTransactionRow,
   MerchantGroup,
@@ -73,7 +77,8 @@ function buildGroupFromRows(
   strictKeys: string[],
   byStrict: Map<string, AssistantTransactionRow[]>,
   categories: CategoryRow[],
-  rules: CategorizationRuleRow[]
+  rules: CategorizationRuleRow[],
+  memoryIndex?: MerchantMemoryIndex
 ): MerchantGroup {
   const sorted = [...rows].sort((a, b) =>
     b.transaction_date.localeCompare(a.transaction_date)
@@ -97,13 +102,23 @@ function buildGroupFromRows(
         .sort((a, b) => b.transactionCount - a.transactionCount)
     : undefined;
 
-  const suggestion = suggestCategoryForGroup({
+  const confirmedHistory = memoryIndex
+    ? lookupMerchantMemory(
+        memoryIndex,
+        direction,
+        representative.description,
+        representative.merchant_name
+      )
+    : null;
+
+  const suggestion = suggestWithMerchantMemory({
     groupKey,
     direction,
     description: representative.description,
     merchant_name: representative.merchant_name,
     categories,
     rules,
+    confirmedHistory,
   });
 
   return {
@@ -130,7 +145,8 @@ function buildGroupFromRows(
 export function buildMerchantGroups(
   transactions: AssistantTransactionRow[],
   categories: CategoryRow[],
-  rules: CategorizationRuleRow[]
+  rules: CategorizationRuleRow[],
+  memoryIndex?: MerchantMemoryIndex
 ): MerchantGroup[] {
   const uncategorised = transactions.filter((tx) => !tx.category_id);
   const byStrict = new Map<string, AssistantTransactionRow[]>();
@@ -176,7 +192,8 @@ export function buildMerchantGroups(
         strictKeyList,
         byStrict,
         categories,
-        rules
+        rules,
+        memoryIndex
       )
     );
   }

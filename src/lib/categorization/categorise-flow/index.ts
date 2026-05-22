@@ -22,6 +22,7 @@ export {
   shouldCreateRule,
 } from "@/lib/categorization/categorise-flow/resolve";
 export {
+  choiceIdFromCategorySlug,
   isCategoryChoiceId,
   isIncomeTypeChoiceId,
   prefillFromSuggestion,

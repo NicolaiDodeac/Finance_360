@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ExternalLink, Trash2 } from "lucide-react";
 import { ReceiptAttachPanel } from "@/components/receipts/receipt-attach-panel";
 import { ReceiptFileIcon } from "@/components/receipts/receipt-file-icon";
+import { TransactionCategoryFields } from "@/components/transactions/transaction-category-fields";
 import { Button } from "@/components/ui/button";
 import {
   Drawer,
@@ -19,40 +20,60 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import type { CategoryRow } from "@/lib/categories/queries";
 import {
   deleteReceipt,
   detachReceiptFromTransaction,
   getReceiptPreviewUrl,
-  updateReceiptMetadata,
+  saveReceiptVault,
 } from "@/lib/receipts/actions";
 import {
+  formatAmountForInput,
   formatFileSize,
   formatMoney,
   formatTransactionDate,
+  normalizeDateForInput,
 } from "@/lib/receipts/format";
 import type { ReceiptWithRelations } from "@/lib/receipts/types";
+import type { HmrcCategoryRow } from "@/lib/hmrc/queries";
+import { attachedTransactionToFormInput } from "@/lib/transactions/category-form";
+import type { TransactionFormInput } from "@/lib/transactions/types";
 import type { TaxYearRow } from "@/lib/tax-years/queries";
 
 interface ReceiptDetailDrawerProps {
   receipt: ReceiptWithRelations | null;
   taxYears: TaxYearRow[];
+  categories: CategoryRow[];
+  hmrcCategories: HmrcCategoryRow[];
   onClose: () => void;
 }
 
 export function ReceiptDetailDrawer({
   receipt,
   taxYears,
+  categories,
+  hmrcCategories,
   onClose,
 }: ReceiptDetailDrawerProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [linkedForm, setLinkedForm] = useState<TransactionFormInput | null>(
+    null
+  );
 
   useEffect(() => {
     if (!receipt) {
       setPreviewUrl(null);
+      setLinkedForm(null);
       return;
+    }
+
+    if (receipt.attached_transaction) {
+      setLinkedForm(attachedTransactionToFormInput(receipt.attached_transaction));
+    } else {
+      setLinkedForm(null);
     }
 
     let cancelled = false;
@@ -67,15 +88,31 @@ export function ReceiptDetailDrawer({
     };
   }, [receipt]);
 
-  function handleMetadataSubmit(e: React.FormEvent<HTMLFormElement>) {
+  function handleSave(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!receipt) return;
 
     setError(null);
     const formData = new FormData(e.currentTarget);
 
+    if (receipt.attached_transaction && linkedForm) {
+      formData.set("sync_linked_transaction", "1");
+      formData.set("linked_transaction_id", receipt.attached_transaction.id);
+      formData.set("category_id", linkedForm.category_id ?? "");
+      formData.set("hmrc_category_id", linkedForm.hmrc_category_id ?? "");
+      if (linkedForm.is_business) {
+        formData.set("is_business", "on");
+        if (linkedForm.business_use_percent !== null) {
+          formData.set(
+            "business_use_percent",
+            String(linkedForm.business_use_percent)
+          );
+        }
+      }
+    }
+
     startTransition(async () => {
-      const result = await updateReceiptMetadata(receipt.id, formData);
+      const result = await saveReceiptVault(receipt.id, formData);
       if (!result.success) {
         setError(result.error ?? "Could not save details.");
         return;
@@ -102,13 +139,28 @@ export function ReceiptDetailDrawer({
 
   function handleDelete() {
     if (!receipt) return;
-    if (!window.confirm("Delete this stored proof? This cannot be undone.")) {
+
+    const attached = receipt.attached_transaction;
+    if (
+      !window.confirm(
+        "Delete this stored proof? This cannot be undone."
+      )
+    ) {
       return;
+    }
+
+    let deleteLinkedTransaction = false;
+    if (attached) {
+      deleteLinkedTransaction = window.confirm(
+        `Also delete the linked transaction (${attached.merchant_name ?? "expense"} · ${formatMoney(Number(attached.amount))})?\n\nOK = delete proof and transaction\nCancel = delete proof only (transaction stays in your list)`
+      );
     }
 
     setError(null);
     startTransition(async () => {
-      const result = await deleteReceipt(receipt.id);
+      const result = await deleteReceipt(receipt.id, {
+        deleteLinkedTransaction,
+      });
       if (!result.success) {
         setError(result.error ?? "Could not delete receipt.");
         return;
@@ -119,6 +171,8 @@ export function ReceiptDetailDrawer({
   }
 
   const attached = receipt?.attached_transaction;
+  const taxYearValue =
+    receipt?.tax_year_id ?? receipt?.tax_year?.id ?? "";
 
   return (
     <Drawer open={!!receipt} onOpenChange={(open) => !open && onClose()}>
@@ -193,8 +247,38 @@ export function ReceiptDetailDrawer({
                 />
               )}
 
-              <form onSubmit={handleMetadataSubmit} className="space-y-4 border-t border-border pt-4">
-                <h4 className="text-sm font-medium">Details</h4>
+              <form
+                key={receipt.id + (receipt.updated_at ?? receipt.created_at)}
+                onSubmit={handleSave}
+                className="space-y-4 border-t border-border pt-4"
+              >
+                {attached && linkedForm ? (
+                  <div className="space-y-4 rounded-xl border border-border bg-card p-4">
+                    <div>
+                      <h4 className="text-sm font-semibold">Category</h4>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Same as editing a transaction — personal and business
+                        options are different. Saving updates the linked
+                        transaction too.
+                      </p>
+                    </div>
+                    <TransactionCategoryFields
+                      form={linkedForm}
+                      onChange={setLinkedForm}
+                      categories={categories}
+                      hmrcCategories={hmrcCategories}
+                      disabled={isPending}
+                      idPrefix="receipt-tx"
+                    />
+                  </div>
+                ) : null}
+
+                <h4 className="text-sm font-medium">Proof details</h4>
+                {!attached ? (
+                  <p className="text-xs text-muted-foreground">
+                    Link a transaction above to set spending and tax categories.
+                  </p>
+                ) : null}
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <MetadataField label="Merchant" id="edit-merchant">
@@ -210,7 +294,7 @@ export function ReceiptDetailDrawer({
                       id="edit-date"
                       name="receipt_date"
                       type="date"
-                      defaultValue={receipt.receipt_date ?? ""}
+                      defaultValue={normalizeDateForInput(receipt.receipt_date)}
                       disabled={isPending}
                     />
                   </MetadataField>
@@ -221,10 +305,9 @@ export function ReceiptDetailDrawer({
                     <Input
                       id="edit-total"
                       name="total_amount"
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      defaultValue={receipt.total_amount ?? ""}
+                      inputMode="decimal"
+                      placeholder="e.g. 16.40 or 16,40"
+                      defaultValue={formatAmountForInput(receipt.total_amount)}
                       disabled={isPending}
                     />
                   </MetadataField>
@@ -246,10 +329,9 @@ export function ReceiptDetailDrawer({
                     <Input
                       id="edit-vat"
                       name="vat_amount"
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      defaultValue={receipt.vat_amount ?? ""}
+                      inputMode="decimal"
+                      placeholder="Optional"
+                      defaultValue={formatAmountForInput(receipt.vat_amount)}
                       disabled={isPending}
                     />
                   </MetadataField>
@@ -259,10 +341,10 @@ export function ReceiptDetailDrawer({
                   <Select
                     id="edit-tax-year"
                     name="tax_year_id"
-                    defaultValue={receipt.tax_year_id ?? ""}
+                    defaultValue={taxYearValue}
                     disabled={isPending}
                   >
-                    <option value="">Not sure yet</option>
+                    <option value="">Infer from receipt date</option>
                     {taxYears.map((taxYear) => (
                       <option key={taxYear.id} value={taxYear.id}>
                         {taxYear.label}
@@ -281,8 +363,8 @@ export function ReceiptDetailDrawer({
                   />
                 </MetadataField>
 
-                <Button type="submit" variant="outline" disabled={isPending}>
-                  {isPending ? "Saving…" : "Save details"}
+                <Button type="submit" disabled={isPending} className="w-full">
+                  {isPending ? "Saving…" : "Save"}
                 </Button>
               </form>
             </DrawerBody>
