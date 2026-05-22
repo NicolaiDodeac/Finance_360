@@ -75,6 +75,7 @@ export async function getDashboardData(
     planningPlans,
     spaceContext: { space, isShared },
     budgetSnapshot,
+    budgetItems: budgetPageSlice.items,
     month,
   });
 }

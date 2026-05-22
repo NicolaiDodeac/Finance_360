@@ -20,6 +20,15 @@ export {
 } from "@/lib/receipts/constants";
 export { formatCount } from "@/lib/receipts/format";
 export {
+  classifyReceiptText,
+  suggestDefaultPurpose,
+  type ReceiptPurpose,
+} from "@/lib/receipts/classify";
+export {
+  buildReceiptCreationSuggestion,
+  needsPaymentPrompt,
+} from "@/lib/receipts/suggest";
+export {
   rankTransactionMatches,
   scoreTransactionForReceipt,
 } from "@/lib/receipts/match";

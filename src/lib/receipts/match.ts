@@ -117,6 +117,45 @@ export function scoreTransactionForReceipt(
   return { score, reasons };
 }
 
+const CARD_ACCOUNT_TYPES = new Set([
+  "credit_card",
+  "current",
+  "other",
+]);
+
+function paymentMatchBoost(
+  paymentMethod: ReceiptPaymentMethod | null | undefined,
+  accountType: string | null | undefined
+): { delta: number; reason?: string } {
+  if (!paymentMethod || paymentMethod === "unknown") {
+    return { delta: 0 };
+  }
+
+  if (paymentMethod === "cash") {
+    if (accountType === "cash") {
+      return { delta: 20, reason: "Cash account" };
+    }
+    if (accountType && CARD_ACCOUNT_TYPES.has(accountType)) {
+      return { delta: -25 };
+    }
+    return { delta: 0 };
+  }
+
+  if (
+    paymentMethod === "card" ||
+    paymentMethod === "contactless"
+  ) {
+    if (accountType && CARD_ACCOUNT_TYPES.has(accountType)) {
+      return { delta: 20, reason: "Card account" };
+    }
+    if (accountType === "cash") {
+      return { delta: -15 };
+    }
+  }
+
+  return { delta: 0 };
+}
+
 export function rankTransactionMatches(
   receipt: Pick<
     ReceiptRow,
@@ -134,7 +173,18 @@ export function rankTransactionMatches(
         receipt,
         transaction
       );
-      return { transaction, score, reasons };
+      const boost = paymentMatchBoost(
+        receipt.payment_method,
+        transaction.account?.account_type
+      );
+      const reasonsWithBoost = boost.reason
+        ? [...reasons, boost.reason]
+        : reasons;
+      return {
+        transaction,
+        score: score + boost.delta,
+        reasons: reasonsWithBoost,
+      };
     })
     .filter((item) => item.score >= minScore)
     .sort((a, b) => b.score - a.score)

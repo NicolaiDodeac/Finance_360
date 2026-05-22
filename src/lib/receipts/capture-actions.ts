@@ -6,18 +6,31 @@ import {
   buildCategorizationMetadata,
   mergeRawImportCategorization,
 } from "@/lib/categorization/apply";
+import { buildAssistantPatchFromResolved } from "@/lib/categorization/categorise-flow/assistant-patch";
+import {
+  resolveCategoryChoice,
+  resolvePurposeNotSure,
+} from "@/lib/categorization/categorise-flow/resolve";
+import type { CategoryChoiceId } from "@/lib/categorization/categorise-flow/types";
 import { incrementRulesTimesMatched } from "@/lib/categorization/increment";
 import { getCategorizationRules } from "@/lib/categorization/queries";
+import { mergeAssistantMetadata } from "@/lib/categorization/assistant-metadata";
 import {
   ensureReceiptAccounts,
   findCashManualAccountId,
   findManualAccountId,
 } from "@/lib/accounts/queries";
+import { getCategories } from "@/lib/categories/queries";
 import { requireAuth } from "@/lib/auth/helpers";
+import { getHmrcCategories } from "@/lib/hmrc/queries";
 import {
   MAX_RECEIPT_FILE_BYTES,
   RECEIPTS_BUCKET,
 } from "@/lib/receipts/constants";
+import {
+  choiceIdForPurpose,
+  classifyReceiptText,
+} from "@/lib/receipts/classify";
 import {
   extractionToOcrData,
   extractReceiptFromBuffer,
@@ -29,6 +42,10 @@ import {
   getReceiptById,
 } from "@/lib/receipts/queries";
 import {
+  buildReceiptCreationSuggestion,
+  needsPaymentPrompt,
+} from "@/lib/receipts/suggest";
+import {
   buildReceiptStoragePath,
   guessMimeType,
   isAllowedReceiptFile,
@@ -37,14 +54,13 @@ import type {
   ActionResult,
   CreateTransactionFromReceiptInput,
   ReceiptCaptureReviewData,
-  ReceiptTransactionKind,
 } from "@/lib/receipts/types";
 import { attachReceiptToTransaction } from "@/lib/receipts/actions";
+import { ensureProfile } from "@/lib/profile/queries";
 import { createClient } from "@/lib/supabase/server";
 import { ensureDefaultCategories } from "@/lib/setup/categories";
 import { findTaxYearForDate, getTaxYears } from "@/lib/tax-years/queries";
-import type { TransactionFormInput } from "@/lib/transactions/types";
-import type { TransactionDirection } from "@/types/database";
+import type { ReceiptPaymentMethod } from "@/types/database";
 
 const REVALIDATE_PATHS = [
   "/receipts",
@@ -57,41 +73,6 @@ const REVALIDATE_PATHS = [
 function revalidateCapturePaths() {
   for (const path of REVALIDATE_PATHS) {
     revalidatePath(path);
-  }
-}
-
-function kindToTransactionDefaults(
-  kind: ReceiptTransactionKind,
-  accounts: Awaited<ReturnType<typeof ensureReceiptAccounts>>
-): { direction: TransactionDirection; accountId: string; isBusiness: boolean } {
-  const cashId = findCashManualAccountId(accounts);
-  const manualId = findManualAccountId(accounts);
-
-  switch (kind) {
-    case "cash_expense":
-      return {
-        direction: "expense",
-        accountId: cashId || manualId,
-        isBusiness: false,
-      };
-    case "card_manual_expense":
-      return {
-        direction: "expense",
-        accountId: manualId || cashId,
-        isBusiness: false,
-      };
-    case "cash_income":
-      return {
-        direction: "income",
-        accountId: cashId || manualId,
-        isBusiness: false,
-      };
-    case "business_income":
-      return {
-        direction: "income",
-        accountId: manualId || cashId,
-        isBusiness: true,
-      };
   }
 }
 
@@ -109,6 +90,19 @@ function applyExtractionToReceiptFields(
     ocr_data: extractionToOcrData(extraction),
     source: "receipt_capture" as const,
   };
+}
+
+function accountIdForPayment(
+  payment: ReceiptPaymentMethod | null,
+  accounts: Awaited<ReturnType<typeof ensureReceiptAccounts>>
+): string {
+  const cashId = findCashManualAccountId(accounts);
+  const manualId = findManualAccountId(accounts);
+
+  if (payment === "cash") {
+    return cashId || manualId;
+  }
+  return manualId || cashId;
 }
 
 export async function captureReceipt(
@@ -196,6 +190,14 @@ export async function getReceiptCaptureReview(
     return { success: false, error: "Receipt not found." };
   }
 
+  const [profile, categories, hmrcCategories] = await Promise.all([
+    ensureProfile(user.id),
+    ensureDefaultCategories(user.id).then(() => getCategories(user.id)),
+    getHmrcCategories(),
+  ]);
+
+  const financeMode = profile?.finance_mode ?? "personal";
+
   const transactions = await getMatchableTransactions(user.id, {
     taxYearId: receipt.tax_year_id,
     receiptId: receipt.id,
@@ -226,6 +228,20 @@ export async function getReceiptCaptureReview(
       : [],
   };
 
+  const classification = classifyReceiptText(
+    receipt.merchant_name,
+    extraction.rawText
+  );
+
+  const creationSuggestion = buildReceiptCreationSuggestion({
+    financeMode,
+    merchant: receipt.merchant_name,
+    rawText: extraction.rawText,
+    paymentMethod: receipt.payment_method,
+    categories,
+    hmrcCategories,
+  });
+
   return {
     success: true,
     data: {
@@ -233,6 +249,10 @@ export async function getReceiptCaptureReview(
       extraction,
       suggestedMatch: candidates[0] ?? null,
       candidates,
+      financeMode,
+      creationSuggestion,
+      showPaymentPrompt: needsPaymentPrompt(receipt.payment_method),
+      classificationLooksBusiness: classification.looksBusinessRelevant,
     },
   };
 }
@@ -241,6 +261,10 @@ export async function createTransactionFromReceipt(
   receiptId: string,
   input: CreateTransactionFromReceiptInput
 ): Promise<ActionResult<{ transactionId: string }>> {
+  if (input.skip) {
+    return { success: true, data: { transactionId: "" } };
+  }
+
   const user = await requireAuth();
   const receipt = await getReceiptById(user.id, receiptId);
 
@@ -259,7 +283,7 @@ export async function createTransactionFromReceipt(
   if (!Number.isFinite(amount) || amount <= 0) {
     return {
       success: false,
-      error: "Enter a total amount on the receipt before creating a transaction.",
+      error: "Add the total amount on the receipt before saving.",
     };
   }
 
@@ -267,81 +291,154 @@ export async function createTransactionFromReceipt(
   if (!transactionDate) {
     return {
       success: false,
-      error: "Enter a receipt date before creating a transaction.",
+      error: "Add the receipt date before saving.",
     };
   }
 
-  const [accounts, rules, taxYears] = await Promise.all([
-    ensureReceiptAccounts(user.id),
-    getCategorizationRules(user.id, { activeOnly: true }),
-    getTaxYears(user.id),
-    ensureDefaultCategories(user.id),
-  ]);
+  if (input.purpose === "personal" && input.record_as_income) {
+    return {
+      success: false,
+      error: "Choose business income only for business turnover.",
+    };
+  }
 
-  const defaults = kindToTransactionDefaults(input.kind, accounts);
-  const accountId = defaults.accountId;
+  const payment: ReceiptPaymentMethod | null =
+    input.payment_method ?? receipt.payment_method;
 
+  const [accounts, rules, taxYears, categories, hmrcCategories] =
+    await Promise.all([
+      ensureReceiptAccounts(user.id),
+      getCategorizationRules(user.id, { activeOnly: true }),
+      getTaxYears(user.id),
+      getCategories(user.id),
+      getHmrcCategories(),
+    ]);
+
+  const accountId = accountIdForPayment(payment, accounts);
   if (!accountId) {
     return { success: false, error: "No account available. Try again shortly." };
   }
 
   const merchant = receipt.merchant_name?.trim() ?? "";
-  const parsed: TransactionFormInput = {
-    account_id: accountId,
-    transaction_date: transactionDate,
-    description: merchant || "Receipt",
-    merchant_name: merchant,
-    amount,
-    direction: defaults.direction,
-    category_id: input.category_id ?? null,
-    hmrc_category_id: input.hmrc_category_id ?? null,
-    is_business: input.is_business ?? defaults.isBusiness,
-    business_use_percent:
-      input.is_business ?? defaults.isBusiness
-        ? (input.business_use_percent ?? 100)
-        : null,
-    notes: input.notes?.trim() ?? "",
-  };
+  const classification = classifyReceiptText(
+    receipt.merchant_name,
+    receipt.ocr_data &&
+      typeof receipt.ocr_data === "object" &&
+      "raw_text" in receipt.ocr_data
+      ? String((receipt.ocr_data as { raw_text?: string }).raw_text ?? "")
+      : null
+  );
+
+  const isIncome = Boolean(input.record_as_income && input.income_kind);
+  const direction = isIncome ? ("income" as const) : ("expense" as const);
+
+  let categoryId: string | null = null;
+  let hmrcCategoryId: string | null = null;
+  let isBusiness = false;
+  let businessUsePercent: number | null = null;
+  let assistantPatch = buildAssistantPatchFromResolved(
+    resolvePurposeNotSure(),
+    undefined,
+    "receipt_capture"
+  );
+
+  if (isIncome && input.income_kind) {
+    isBusiness = input.income_kind === "business_income";
+    const incomeChoice: CategoryChoiceId = isBusiness
+      ? "business_turnover"
+      : "other_personal_income";
+    const resolved = resolveCategoryChoice(
+      isBusiness ? "business" : "personal",
+      incomeChoice,
+      categories,
+      hmrcCategories,
+      null
+    );
+    categoryId = resolved.categoryId;
+    hmrcCategoryId = null;
+    assistantPatch = buildAssistantPatchFromResolved(
+      resolved,
+      incomeChoice,
+      "receipt_capture"
+    );
+  } else if (input.purpose === "not_sure") {
+    const resolved = resolvePurposeNotSure();
+    assistantPatch = buildAssistantPatchFromResolved(
+      resolved,
+      undefined,
+      "receipt_capture"
+    );
+  } else {
+    const choiceId =
+      choiceIdForPurpose(input.purpose, classification) ??
+      (input.purpose === "business"
+        ? "other_business_expense"
+        : "other_personal_expense");
+
+    const resolved = resolveCategoryChoice(
+      input.purpose,
+      choiceId,
+      categories,
+      hmrcCategories,
+      input.purpose === "business" ? 100 : null
+    );
+
+    categoryId = resolved.categoryId;
+    hmrcCategoryId =
+      input.purpose === "business" ? resolved.hmrcCategoryId : null;
+    isBusiness = input.purpose === "business" && resolved.isBusiness;
+    businessUsePercent =
+      input.purpose === "business" ? (resolved.businessUsePercent ?? 100) : null;
+
+    assistantPatch = buildAssistantPatchFromResolved(
+      resolved,
+      choiceId,
+      "receipt_capture"
+    );
+  }
 
   const applied = applyCategorizationRules(
     {
-      description: parsed.description.trim() || null,
-      merchant_name: parsed.merchant_name.trim() || null,
+      description: merchant || "Receipt",
+      merchant_name: merchant || null,
     },
     rules,
     {
       onlyFillEmpty: true,
       existing: {
-        category_id: parsed.category_id,
-        hmrc_category_id: parsed.hmrc_category_id,
-        is_business: parsed.is_business,
+        category_id: categoryId,
+        hmrc_category_id: hmrcCategoryId,
+        is_business: isBusiness,
       },
     }
   );
 
-  const categorizedInput: TransactionFormInput = {
-    ...parsed,
-    category_id: applied.category_id,
-    hmrc_category_id: applied.hmrc_category_id,
-    is_business: applied.is_business ?? parsed.is_business,
-  };
+  categoryId = applied.category_id ?? categoryId;
+  hmrcCategoryId =
+    input.purpose === "business"
+      ? (applied.hmrc_category_id ?? hmrcCategoryId)
+      : null;
+  isBusiness = applied.is_business ?? isBusiness;
 
-  const captureMeta = {
+  const captureMeta: Record<string, unknown> = {
     source: "receipt_capture",
     receipt_id: receiptId,
-    kind: input.kind,
+    purpose: input.purpose,
+    payment_method: payment,
   };
 
-  const rawImportData = applied.matched_rule
-    ? mergeRawImportCategorization(
-        captureMeta,
-        buildCategorizationMetadata(applied.matched_rule)
-      )
-    : captureMeta;
+  let rawImportData = mergeAssistantMetadata(captureMeta, assistantPatch);
+
+  if (applied.matched_rule) {
+    rawImportData = mergeRawImportCategorization(
+      rawImportData,
+      buildCategorizationMetadata(applied.matched_rule)
+    );
+  }
 
   const taxYearId =
     receipt.tax_year_id ??
-    findTaxYearForDate(taxYears, categorizedInput.transaction_date)?.id ??
+    findTaxYearForDate(taxYears, transactionDate)?.id ??
     null;
 
   const supabase = await createClient();
@@ -349,19 +446,17 @@ export async function createTransactionFromReceipt(
     .from("transactions")
     .insert({
       user_id: user.id,
-      account_id: categorizedInput.account_id,
-      transaction_date: categorizedInput.transaction_date,
-      description: categorizedInput.description.trim() || null,
-      merchant_name: categorizedInput.merchant_name.trim() || null,
-      amount: categorizedInput.amount,
-      direction: categorizedInput.direction,
-      category_id: categorizedInput.category_id,
-      hmrc_category_id: categorizedInput.hmrc_category_id,
-      is_business: categorizedInput.is_business,
-      business_use_percent: categorizedInput.is_business
-        ? categorizedInput.business_use_percent
-        : null,
-      notes: categorizedInput.notes.trim() || null,
+      account_id: accountId,
+      transaction_date: transactionDate,
+      description: merchant || "Receipt",
+      merchant_name: merchant || null,
+      amount,
+      direction,
+      category_id: categoryId,
+      hmrc_category_id: hmrcCategoryId,
+      is_business: isBusiness,
+      business_use_percent: isBusiness ? businessUsePercent : null,
+      notes: null,
       tax_year_id: taxYearId,
       raw_import_data: rawImportData,
     })
@@ -376,11 +471,20 @@ export async function createTransactionFromReceipt(
     await incrementRulesTimesMatched(user.id, [applied.matched_rule.id]);
   }
 
+  if (payment && payment !== receipt.payment_method) {
+    await supabase
+      .from("receipts")
+      .update({ payment_method: payment })
+      .eq("id", receiptId)
+      .eq("user_id", user.id);
+  }
+
   const link = await attachReceiptToTransaction(receiptId, data.id);
   if (!link.success) {
     return {
       success: false,
-      error: link.error ?? "Transaction created but receipt could not be linked.",
+      error:
+        link.error ?? "Saved, but the receipt could not be linked. Try again.",
     };
   }
 

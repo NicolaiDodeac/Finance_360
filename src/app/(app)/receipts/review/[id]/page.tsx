@@ -4,7 +4,10 @@ import { ReceiptCaptureReviewView } from "@/components/receipts/receipt-capture-
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { requireAuth } from "@/lib/auth/helpers";
+import { getCategories } from "@/lib/categories/queries";
+import { getHmrcCategories } from "@/lib/hmrc/queries";
 import { getReceiptCaptureReview } from "@/lib/receipts/capture-actions";
+import { ensureDefaultCategories } from "@/lib/setup/categories";
 import { getTaxYears } from "@/lib/tax-years/queries";
 
 interface ReceiptReviewPageProps {
@@ -17,9 +20,11 @@ export default async function ReceiptReviewPage({
   const { id } = await params;
   const user = await requireAuth();
 
-  const [reviewResult, taxYears] = await Promise.all([
+  const [reviewResult, taxYears, categories, hmrcCategories] = await Promise.all([
     getReceiptCaptureReview(id),
     getTaxYears(user.id),
+    ensureDefaultCategories(user.id).then(() => getCategories(user.id)),
+    getHmrcCategories(),
   ]);
 
   if (!reviewResult.success || !reviewResult.data) {
@@ -43,10 +48,12 @@ export default async function ReceiptReviewPage({
     <>
       <PageHeader
         title="Review receipt"
-        description="Check what we read from your receipt, then link or create a transaction."
+        description="Confirm what this was for, then link or create a transaction."
       />
       <ReceiptCaptureReviewView
         review={reviewResult.data}
+        categories={categories}
+        hmrcCategories={hmrcCategories}
         taxYears={taxYears}
       />
     </>

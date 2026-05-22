@@ -11,7 +11,9 @@ import type { SpendingInsights } from "@/lib/dashboard/spending-insights";
 export interface DashboardCategorySpend {
   categoryId: string | null;
   categoryName: string;
-  totalAmount: number;
+  actualAmount: number;
+  /** Monthly plan target when a budget exists for this category; otherwise null. */
+  plannedAmount: number | null;
 }
 
 export interface DashboardMonthlyCashflow {
