@@ -1,3 +1,4 @@
+import { extractMerchantFromReceiptText } from "@/lib/receipts/ocr/extract-merchant";
 import type { ReceiptPaymentMethod } from "@/types/database";
 import type { ReceiptOcrExtraction } from "@/lib/receipts/ocr/types";
 
@@ -26,9 +27,6 @@ const PAYMENT_PATTERNS: Array<{
     pattern: /\b(card|debit|credit|visa|mastercard|amex|chip\s*&\s*pin)\b/i,
   },
 ];
-
-const MERCHANT_SKIP =
-  /^(receipt|invoice|tax|vat|total|subtotal|thank|welcome|tel|phone|www\.|http|date|time|qty|item)/i;
 
 function parseAmount(raw: string): number | null {
   const cleaned = raw.replace(/,/g, "");
@@ -129,20 +127,6 @@ function extractPaymentMethod(text: string): ReceiptPaymentMethod | null {
   return null;
 }
 
-function extractMerchant(text: string): string | null {
-  const lines = text
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter((l) => l.length >= 2 && l.length <= 80);
-
-  for (const line of lines.slice(0, 12)) {
-    if (MERCHANT_SKIP.test(line)) continue;
-    if (/^[\d£$.,\s%-]+$/.test(line)) continue;
-    if (line.length >= 3) return line;
-  }
-  return null;
-}
-
 function buildConfidence(
   extraction: Omit<ReceiptOcrExtraction, "confidence" | "fieldsFound">
 ): Pick<ReceiptOcrExtraction, "confidence" | "fieldsFound"> {
@@ -166,6 +150,8 @@ export function parseReceiptText(text: string): ReceiptOcrExtraction {
   if (!normalized) {
     return {
       merchant: null,
+      merchantSource: "unknown",
+      knownMerchantId: null,
       receiptDate: null,
       totalAmount: null,
       vatAmount: null,
@@ -176,8 +162,12 @@ export function parseReceiptText(text: string): ReceiptOcrExtraction {
     };
   }
 
+  const merchantResult = extractMerchantFromReceiptText(normalized);
+
   const base = {
-    merchant: extractMerchant(normalized),
+    merchant: merchantResult.merchant,
+    merchantSource: merchantResult.source,
+    knownMerchantId: merchantResult.knownMerchantId,
     receiptDate: extractDate(normalized),
     totalAmount: extractTotal(normalized),
     vatAmount: extractVat(normalized),

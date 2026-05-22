@@ -41,10 +41,28 @@ export interface CreateTransactionFromReceiptInput {
   income_kind?: "cash_income" | "business_income";
 }
 
+export type MatchConfidence = "strong" | "medium" | "weak" | "none";
+
+export interface ReceiptMatchDebug {
+  amountDiff: number | null;
+  amountTier: MatchConfidence | "n/a";
+  dateDiff: number | null;
+  dateTier: MatchConfidence | "n/a";
+  merchantTier:
+    | "strong"
+    | "medium"
+    | "none"
+    | "contradictory"
+    | "n/a";
+  finalConfidence: MatchConfidence;
+  compositeScore: number;
+}
+
 export interface ReceiptCaptureReviewData {
   receipt: ReceiptWithRelations;
   extraction: ReceiptOcrExtraction;
   suggestedMatch: ReceiptMatchCandidate | null;
+  closestMatch: ReceiptMatchCandidate | null;
   candidates: ReceiptMatchCandidate[];
   financeMode: FinanceMode;
   creationSuggestion: ReceiptCreationSuggestion;
@@ -69,8 +87,10 @@ export interface ReceiptFormInput {
 
 export interface ReceiptMatchCandidate {
   transaction: ReceiptAttachedTransaction;
+  confidence: MatchConfidence;
   score: number;
   reasons: string[];
+  debug: ReceiptMatchDebug;
 }
 
 export interface ActionResult<T = void> {

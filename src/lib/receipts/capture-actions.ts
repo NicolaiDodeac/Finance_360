@@ -203,7 +203,7 @@ export async function getReceiptCaptureReview(
     receiptId: receipt.id,
   });
 
-  const candidates = rankTransactionMatches(receipt, transactions, {
+  const ranked = rankTransactionMatches(receipt, transactions, {
     limit: 12,
   });
 
@@ -214,6 +214,13 @@ export async function getReceiptCaptureReview(
 
   const extraction: ReceiptOcrExtraction = {
     merchant: receipt.merchant_name,
+    merchantSource:
+      (ocr?.merchant_source as ReceiptOcrExtraction["merchantSource"]) ??
+      "unknown",
+    knownMerchantId:
+      typeof ocr?.known_merchant_id === "string"
+        ? ocr.known_merchant_id
+        : null,
     receiptDate: receipt.receipt_date,
     totalAmount:
       receipt.total_amount !== null ? Number(receipt.total_amount) : null,
@@ -247,8 +254,9 @@ export async function getReceiptCaptureReview(
     data: {
       receipt,
       extraction,
-      suggestedMatch: candidates[0] ?? null,
-      candidates,
+      suggestedMatch: ranked.suggestedMatch,
+      closestMatch: ranked.closestMatch,
+      candidates: ranked.candidates,
       financeMode,
       creationSuggestion,
       showPaymentPrompt: needsPaymentPrompt(receipt.payment_method),

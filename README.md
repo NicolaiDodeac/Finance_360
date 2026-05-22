@@ -37,6 +37,18 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+## Database migrations
+
+SQL migrations live in `supabase/migrations/`. They are **not** applied automatically when you run the app — you must run them against your Supabase Postgres database.
+
+**Supabase Dashboard:** Project → **SQL** → **New query**, paste the contents of each migration file in order (by filename), then **Run**.
+
+If Smart Receipt Capture errors with *Could not find the 'ocr_data' column*, run at least:
+
+`supabase/migrations/20250520100000_receipt_capture.sql`
+
+After running SQL, wait a few seconds (or restart the dev server) so PostgREST refreshes its schema cache.
+
 ## Project structure
 
 ```

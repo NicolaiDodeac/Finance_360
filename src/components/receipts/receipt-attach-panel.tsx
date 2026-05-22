@@ -135,10 +135,19 @@ export function ReceiptAttachPanel({
                 <p className="text-xs text-muted-foreground">
                   {formatMoney(Number(item.transaction.amount))} ·{" "}
                   {formatTransactionDate(item.transaction.transaction_date)}
+                  {item.confidence !== "none"
+                    ? ` · ${item.confidence} match`
+                    : ""}
                   {item.reasons.length > 0
                     ? ` · ${item.reasons.join(", ")}`
                     : ""}
                 </p>
+                {process.env.NODE_ENV === "development" ? (
+                  <p className="text-[10px] text-muted-foreground/80">
+                    Δ£{item.debug.amountDiff?.toFixed(2) ?? "—"} ·{" "}
+                    {item.debug.dateDiff ?? "—"}d · {item.debug.merchantTier}
+                  </p>
+                ) : null}
               </div>
               <Button
                 type="button"

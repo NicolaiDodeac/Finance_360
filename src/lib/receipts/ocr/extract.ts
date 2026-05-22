@@ -58,6 +58,8 @@ export function extractionToOcrData(
 ): Record<string, unknown> {
   return {
     merchant: extraction.merchant,
+    merchant_source: extraction.merchantSource,
+    known_merchant_id: extraction.knownMerchantId,
     receipt_date: extraction.receiptDate,
     total_amount: extraction.totalAmount,
     vat_amount: extraction.vatAmount,

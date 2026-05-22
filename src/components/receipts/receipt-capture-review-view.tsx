@@ -24,7 +24,10 @@ import {
   formatTransactionDate,
 } from "@/lib/receipts/format";
 import { buildReceiptCreationSuggestion } from "@/lib/receipts/suggest";
-import type { ReceiptCaptureReviewData } from "@/lib/receipts/types";
+import type {
+  ReceiptCaptureReviewData,
+  ReceiptMatchCandidate,
+} from "@/lib/receipts/types";
 import type { CategoryRow } from "@/lib/categories/queries";
 import type { HmrcCategoryRow } from "@/lib/hmrc/queries";
 import { showsBusinessFeatures } from "@/lib/profile/types";
@@ -50,7 +53,9 @@ export function ReceiptCaptureReviewView({
   hmrcCategories,
 }: ReceiptCaptureReviewViewProps) {
   const router = useRouter();
-  const { receipt, extraction, suggestedMatch, financeMode } = review;
+  const { receipt, extraction, suggestedMatch, closestMatch, financeMode } =
+    review;
+  const isDev = process.env.NODE_ENV === "development";
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -130,13 +135,12 @@ export function ReceiptCaptureReviewView({
 
   const attached = receipt.attached_transaction;
 
-  function handleLinkSuggested() {
-    if (!suggestedMatch) return;
+  function handleLinkMatch(match: ReceiptMatchCandidate) {
     setError(null);
     startTransition(async () => {
       const result = await attachReceiptToTransaction(
         receipt.id,
-        suggestedMatch.transaction.id
+        match.transaction.id
       );
       if (!result.success) {
         setError(result.error ?? "Could not link receipt.");
@@ -355,24 +359,13 @@ export function ReceiptCaptureReviewView({
       {hasBankMatch ? (
         <section className="space-y-3 rounded-xl border border-primary/30 bg-primary/5 p-4">
           <p className="text-sm font-medium">Possible match found</p>
-          <div className="rounded-lg border border-border bg-card px-3 py-3 text-sm">
-            <p className="font-medium">
-              {suggestedMatch!.transaction.merchant_name ??
-                suggestedMatch!.transaction.description ??
-                "Transaction"}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {formatMoney(Number(suggestedMatch!.transaction.amount))} ·{" "}
-              {formatTransactionDate(
-                suggestedMatch!.transaction.transaction_date
-              )}
-            </p>
-          </div>
+          <MatchTransactionCard match={suggestedMatch!} />
+          {isDev ? <MatchDebugPanel match={suggestedMatch!} /> : null}
           <Button
             type="button"
             className="h-12 w-full text-base"
             disabled={isPending}
-            onClick={handleLinkSuggested}
+            onClick={() => handleLinkMatch(suggestedMatch!)}
           >
             <Check className="h-4 w-4" />
             Link receipt
@@ -390,10 +383,31 @@ export function ReceiptCaptureReviewView({
       ) : (
         <>
           <section className="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-3">
-            <p className="text-sm font-medium">
-              No matching bank transaction found
+            <p className="text-sm font-medium">No confident match found</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              We could not find a transaction that closely matches this receipt.
             </p>
           </section>
+
+          {closestMatch ? (
+            <section className="space-y-3 rounded-xl border border-amber-200/60 bg-amber-50/40 p-4 dark:border-amber-900/40 dark:bg-amber-950/20">
+              <p className="text-sm font-medium">Closest transaction</p>
+              <p className="text-xs text-amber-900/90 dark:text-amber-200/90">
+                Review carefully — amount or merchant does not fully match.
+              </p>
+              <MatchTransactionCard match={closestMatch} />
+              {isDev ? <MatchDebugPanel match={closestMatch} /> : null}
+              <Button
+                type="button"
+                variant="outline"
+                className="h-12 w-full"
+                disabled={isPending}
+                onClick={() => handleLinkMatch(closestMatch)}
+              >
+                Link anyway
+              </Button>
+            </section>
+          ) : null}
 
           <section className="space-y-4 rounded-xl border border-border bg-card p-4">
             <p className="text-sm font-medium">We can create this for you:</p>
@@ -520,6 +534,50 @@ function ProofBanner() {
     <p className="rounded-lg bg-muted/50 px-3 py-2 text-center text-sm text-muted-foreground">
       Receipt saved as proof.
     </p>
+  );
+}
+
+function MatchTransactionCard({ match }: { match: ReceiptMatchCandidate }) {
+  return (
+    <div className="rounded-lg border border-border bg-card px-3 py-3 text-sm">
+      <p className="font-medium">
+        {match.transaction.merchant_name ??
+          match.transaction.description ??
+          "Transaction"}
+      </p>
+      <p className="text-xs text-muted-foreground">
+        {formatMoney(Number(match.transaction.amount))} ·{" "}
+        {formatTransactionDate(match.transaction.transaction_date)}
+        {match.reasons.length > 0 ? ` · ${match.reasons.join(", ")}` : ""}
+      </p>
+    </div>
+  );
+}
+
+function MatchDebugPanel({ match }: { match: ReceiptMatchCandidate }) {
+  const { debug } = match;
+  if (process.env.NODE_ENV !== "development") return null;
+
+  console.info("[receipt-match]", {
+    merchant: match.transaction.merchant_name ?? match.transaction.description,
+    amountDiff: debug.amountDiff,
+    dateDiff: debug.dateDiff,
+    merchantTier: debug.merchantTier,
+    amountTier: debug.amountTier,
+    dateTier: debug.dateTier,
+    finalConfidence: debug.finalConfidence,
+    compositeScore: debug.compositeScore,
+  });
+
+  return (
+    <pre className="overflow-x-auto rounded-md bg-muted/60 p-2 text-[10px] leading-relaxed text-muted-foreground">
+      {`match debug
+amount diff: ${debug.amountDiff ?? "—"} (${debug.amountTier})
+date diff: ${debug.dateDiff ?? "—"} days (${debug.dateTier})
+merchant: ${debug.merchantTier}
+confidence: ${debug.finalConfidence}
+score: ${debug.compositeScore}`}
+    </pre>
   );
 }
 

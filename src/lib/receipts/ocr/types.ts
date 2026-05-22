@@ -1,7 +1,12 @@
 import type { ReceiptPaymentMethod } from "@/types/database";
 
+import type { MerchantExtractSource } from "@/lib/receipts/ocr/extract-merchant";
+
 export interface ReceiptOcrExtraction {
   merchant: string | null;
+  /** How the merchant name was chosen (audit). */
+  merchantSource: MerchantExtractSource;
+  knownMerchantId: string | null;
   receiptDate: string | null;
   totalAmount: number | null;
   vatAmount: number | null;
@@ -13,6 +18,8 @@ export interface ReceiptOcrExtraction {
 
 export const EMPTY_RECEIPT_EXTRACTION: ReceiptOcrExtraction = {
   merchant: null,
+  merchantSource: "unknown",
+  knownMerchantId: null,
   receiptDate: null,
   totalAmount: null,
   vatAmount: null,

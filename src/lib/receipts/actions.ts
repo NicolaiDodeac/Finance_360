@@ -334,8 +334,8 @@ export async function getReceiptMatchCandidates(
     receiptId: receipt.id,
   });
 
-  const candidates = rankTransactionMatches(receipt, transactions);
-  return { success: true, data: candidates };
+  const ranked = rankTransactionMatches(receipt, transactions);
+  return { success: true, data: ranked.candidates };
 }
 
 export async function getReceiptPreviewUrl(

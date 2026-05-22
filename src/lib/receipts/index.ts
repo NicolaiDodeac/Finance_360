@@ -29,9 +29,14 @@ export {
   needsPaymentPrompt,
 } from "@/lib/receipts/suggest";
 export {
+  assertConservativeReceiptMatching,
   rankTransactionMatches,
+  scoreAmountTier,
+  scoreDateTier,
+  scoreMerchantTier,
   scoreTransactionForReceipt,
 } from "@/lib/receipts/match";
+export type { RankedReceiptMatches } from "@/lib/receipts/match";
 export {
   createReceiptSignedUrl,
   getMatchableTransactions,
@@ -47,9 +52,11 @@ export {
 } from "@/lib/receipts/storage";
 export type {
   ActionResult,
+  MatchConfidence,
   ReceiptAttachedTransaction,
   ReceiptFormInput,
   ReceiptMatchCandidate,
+  ReceiptMatchDebug,
   ReceiptRow,
   ReceiptWithRelations,
 } from "@/lib/receipts/types";
