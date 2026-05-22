@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ReceiptCaptureReviewView } from "@/components/receipts/receipt-capture-review-view";
+import { ReceiptCaptureReviewGate } from "@/components/receipts/receipt-capture-review-gate";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { requireAuth } from "@/lib/auth/helpers";
@@ -9,6 +9,8 @@ import { getHmrcCategories } from "@/lib/hmrc/queries";
 import { getReceiptCaptureReview } from "@/lib/receipts/capture-actions";
 import { ensureDefaultCategories } from "@/lib/setup/categories";
 import { getTaxYears } from "@/lib/tax-years/queries";
+
+export const maxDuration = 60;
 
 interface ReceiptReviewPageProps {
   params: Promise<{ id: string }>;
@@ -50,7 +52,7 @@ export default async function ReceiptReviewPage({
         title="Review receipt"
         description="Confirm what this was for, then link or create a transaction."
       />
-      <ReceiptCaptureReviewView
+      <ReceiptCaptureReviewGate
         review={reviewResult.data}
         categories={categories}
         hmrcCategories={hmrcCategories}

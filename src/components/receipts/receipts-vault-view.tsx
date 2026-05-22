@@ -36,7 +36,10 @@ export function ReceiptsVaultView({
   useEffect(() => {
     if (!selected) return;
     const updated = receipts.find((r) => r.id === selected.id);
-    if (updated && updated !== selected) setSelected(updated);
+    if (!updated) return;
+    if (updated.updated_at !== selected.updated_at) {
+      setSelected(updated);
+    }
   }, [receipts, selected]);
 
   function handleReceiptSelect(receipt: ReceiptWithRelations) {

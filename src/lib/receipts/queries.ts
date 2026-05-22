@@ -163,7 +163,7 @@ export async function getMatchableTransactions(
     throw new Error(error.message);
   }
 
-  return (data ?? []) as ReceiptAttachedTransaction[];
+  return (data ?? []).map((tx) => mapAttachedTransaction(tx));
 }
 
 export async function getUnattachedReceiptsForUser(

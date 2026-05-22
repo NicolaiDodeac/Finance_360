@@ -1,5 +1,6 @@
 export {
   captureReceipt,
+  runReceiptCaptureOcr,
   createTransactionFromReceipt,
   getReceiptCaptureReview,
 } from "@/lib/receipts/capture-actions";

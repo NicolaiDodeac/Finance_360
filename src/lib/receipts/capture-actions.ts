@@ -36,7 +36,10 @@ import {
   extractionToOcrData,
   extractReceiptFromBuffer,
 } from "@/lib/receipts/ocr/extract";
-import type { ReceiptOcrExtraction } from "@/lib/receipts/ocr/types";
+import {
+  EMPTY_RECEIPT_EXTRACTION,
+  type ReceiptOcrExtraction,
+} from "@/lib/receipts/ocr/types";
 import { findSimilarReceipts } from "@/lib/receipts/duplicate-receipts";
 import { rankTransactionMatches } from "@/lib/receipts/match";
 import {
@@ -142,8 +145,6 @@ export async function captureReceipt(
   const mimeType = guessMimeType(file.name, file.type);
   const buffer = Buffer.from(await file.arrayBuffer());
 
-  const extraction = await extractReceiptFromBuffer(buffer, mimeType);
-
   const supabase = await createClient();
   const { error: uploadError } = await supabase.storage
     .from(RECEIPTS_BUCKET)
@@ -156,15 +157,6 @@ export async function captureReceipt(
     return { success: false, error: uploadError.message };
   }
 
-  const fields = applyExtractionToReceiptFields(extraction, tax_year_id);
-  const draftRow = {
-    merchant_name: fields.merchant_name,
-    total_amount: fields.total_amount,
-    receipt_date: fields.receipt_date,
-    status: "ready" as const,
-  };
-  const status = deriveReceiptStatus(draftRow, extraction);
-
   const { data, error } = await supabase
     .from("receipts")
     .insert({
@@ -174,8 +166,15 @@ export async function captureReceipt(
       mime_type: mimeType,
       file_size_bytes: file.size,
       notes: null,
-      ...fields,
-      status,
+      merchant_name: null,
+      receipt_date: null,
+      total_amount: null,
+      vat_amount: null,
+      payment_method: null,
+      tax_year_id: tax_year_id,
+      ocr_data: null,
+      source: "receipt_capture" as const,
+      status: "processing" as const,
     })
     .select("id")
     .single();
@@ -535,6 +534,13 @@ export interface RetryReceiptOcrResult {
   totalAmount: number | null;
 }
 
+/** Run OCR on a stored receipt (initial capture or retry). */
+export async function runReceiptCaptureOcr(
+  receiptId: string
+): Promise<ActionResult<RetryReceiptOcrResult>> {
+  return retryReceiptOcr(receiptId);
+}
+
 /** Re-run OCR on an existing receipt file and refresh metadata. */
 export async function retryReceiptOcr(
   receiptId: string
@@ -564,6 +570,21 @@ export async function retryReceiptOcr(
   const extraction = await extractReceiptFromBuffer(buffer, mimeType);
 
   if (extraction.ocrError && !extraction.rawText?.trim()) {
+    await supabase
+      .from("receipts")
+      .update({
+        status: "needs_review",
+        ocr_data: {
+          ...extractionToOcrData(EMPTY_RECEIPT_EXTRACTION),
+          scan_error: extraction.ocrError ?? null,
+        },
+      })
+      .eq("id", receiptId)
+      .eq("user_id", user.id);
+
+    revalidateCapturePaths();
+    revalidatePath(`/receipts/review/${receiptId}`);
+
     return {
       success: false,
       error: extraction.ocrError,

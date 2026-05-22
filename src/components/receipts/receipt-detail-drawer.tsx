@@ -77,11 +77,15 @@ export function ReceiptDetailDrawer({
     }
 
     let cancelled = false;
-    getReceiptPreviewUrl(receipt.id).then((result) => {
-      if (!cancelled && result.success && result.data) {
-        setPreviewUrl(result.data.url);
-      }
-    });
+    getReceiptPreviewUrl(receipt.id)
+      .then((result) => {
+        if (!cancelled && result.success && result.data) {
+          setPreviewUrl(result.data.url);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setPreviewUrl(null);
+      });
 
     return () => {
       cancelled = true;
