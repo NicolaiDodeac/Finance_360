@@ -1,7 +1,8 @@
 "use client";
 
+import { useMemo } from "react";
 import { Pencil, Trash2 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { UniversalCategorisationReview } from "@/components/categorization/universal-categorisation-review";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,9 +12,15 @@ import {
   getCategoryOptionLabel,
   getSelectableCategories,
 } from "@/lib/categories/display";
+import {
+  buildDetectedFields,
+  buildSuggestedFromResolved,
+} from "@/lib/categorization/review-builders";
+import { buildReviewContext } from "@/lib/categorization/review-confidence";
+import { resolveCategoryChoice } from "@/lib/categorization/categorise-flow/resolve";
+import { resolvePurposeNotSure } from "@/lib/categorization/categorise-flow/resolve";
 import type { HmrcCategoryRow } from "@/lib/hmrc/queries";
 import type { QuickAddDraft } from "@/lib/quick-add/types";
-import { flowTypeBadgeLabel } from "@/lib/transactions/flow-type";
 import { formatMoney } from "@/lib/transactions/format";
 import type { TransactionDirection } from "@/types/database";
 
@@ -52,7 +59,47 @@ export function QuickAddDraftCard({
   onChange,
   onDoneEdit,
 }: QuickAddDraftCardProps) {
-  const flowBadge = draft.flowType ? flowTypeBadgeLabel(draft.flowType) : null;
+  const resolved = useMemo(() => {
+    if (!draft.categoryChoiceId) return resolvePurposeNotSure();
+    return resolveCategoryChoice(
+      draft.purpose,
+      draft.categoryChoiceId,
+      categories,
+      hmrcCategories,
+      null
+    );
+  }, [draft, categories, hmrcCategories]);
+
+  const suggested = buildSuggestedFromResolved(
+    resolved,
+    draft.purpose,
+    null
+  );
+
+  const context = buildReviewContext({
+    detected: buildDetectedFields({
+      merchant: draft.merchant_name,
+      amount: formatMoney(draft.amount, currency),
+      date: draft.transaction_date,
+    }),
+    suggested,
+    direction: draft.direction,
+    purpose: draft.purpose,
+    isBusiness: draft.isBusiness,
+    suggestion: {
+      categoryId: draft.categoryId,
+      categoryName: draft.categoryName,
+      hmrcCategoryId: draft.hmrcCategoryId,
+      isBusiness: draft.isBusiness,
+      confidence: draft.confidence === "high" ? "high" : "medium",
+      reason: draft.reviewRecommended ? "Review recommended" : "Parsed from your note",
+      source: "pattern",
+    },
+    resolved,
+    amountValid: draft.amount > 0,
+    dateValid: Boolean(draft.transaction_date),
+    merchantKnown: Boolean(draft.merchant_name),
+  });
 
   if (editing) {
     return (
@@ -161,34 +208,6 @@ export function QuickAddDraftCard({
               ))}
             </Select>
           </div>
-          {draft.isBusiness ? (
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label htmlFor={`hmrc-${draft.id}`}>HMRC category</Label>
-              <Select
-                id={`hmrc-${draft.id}`}
-                value={draft.hmrcCategoryId ?? ""}
-                disabled={disabled}
-                onChange={(e) => {
-                  const hmrc = hmrcCategories.find(
-                    (h) => h.id === e.target.value
-                  );
-                  onChange({
-                    ...draft,
-                    hmrcCategoryId: e.target.value || null,
-                    hmrcCategoryName: hmrc?.name ?? null,
-                    hmrcCategoryCode: hmrc?.code ?? null,
-                  });
-                }}
-              >
-                <option value="">None</option>
-                {hmrcCategories.map((h) => (
-                  <option key={h.id} value={h.id}>
-                    {h.name}
-                  </option>
-                ))}
-              </Select>
-            </div>
-          ) : null}
         </div>
 
         <Button type="button" size="sm" disabled={disabled} onClick={onDoneEdit}>
@@ -199,73 +218,36 @@ export function QuickAddDraftCard({
   }
 
   return (
-    <div className="rounded-xl border bg-card p-4 space-y-3">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <p className="font-medium">{draft.merchant_name || "Untitled"}</p>
-          <p className="text-sm text-muted-foreground tabular-nums">
-            {formatMoney(draft.amount, currency)} · {draft.direction}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          <Badge
-            variant={
-              draft.confidence === "high" ? "secondary" : "warning"
-            }
+    <div className="space-y-2">
+      <UniversalCategorisationReview
+        context={context}
+        onConfirm={onDoneEdit}
+        confirmLabel="Looks good"
+        disabled={disabled}
+        changePanel={
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={disabled}
+            onClick={onEdit}
           >
-            {draft.confidence === "high" ? "High confidence" : "Review recommended"}
-          </Badge>
-          {flowBadge ? <Badge variant="muted">{flowBadge}</Badge> : null}
-        </div>
-      </div>
-
-      <dl className="grid gap-1 text-sm text-muted-foreground sm:grid-cols-2">
-        <div>
-          <dt className="inline">Date: </dt>
-          <dd className="inline text-foreground">{draft.transaction_date}</dd>
-        </div>
-        {draft.categoryName ? (
-          <div>
-            <dt className="inline">Category: </dt>
-            <dd className="inline text-foreground">{draft.categoryName}</dd>
-          </div>
-        ) : null}
-        {draft.purpose === "business" || draft.isBusiness ? (
-          <div>
-            <dt className="inline">Purpose: </dt>
-            <dd className="inline text-foreground">Business</dd>
-          </div>
-        ) : null}
-        {draft.hmrcCategoryName ? (
-          <div className="sm:col-span-2">
-            <dt className="inline">HMRC: </dt>
-            <dd className="inline text-foreground">{draft.hmrcCategoryName}</dd>
-          </div>
-        ) : null}
-      </dl>
-
-      <div className="flex gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={disabled}
-          onClick={onEdit}
-        >
-          <Pencil className="h-4 w-4" />
-          Edit
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          disabled={disabled}
-          onClick={onDiscard}
-        >
-          <Trash2 className="h-4 w-4" />
-          Discard
-        </Button>
-      </div>
+            <Pencil className="h-4 w-4" />
+            Edit fields
+          </Button>
+        }
+      />
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="w-full"
+        disabled={disabled}
+        onClick={onDiscard}
+      >
+        <Trash2 className="h-4 w-4" />
+        Discard
+      </Button>
     </div>
   );
 }

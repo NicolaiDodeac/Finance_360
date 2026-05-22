@@ -3,6 +3,9 @@ import { PageHeader } from "@/components/shared/page-header";
 import { ReceiptsLoading } from "@/components/receipts/receipts-loading";
 import { ReceiptsVaultView } from "@/components/receipts/receipts-vault-view";
 import { requireAuth } from "@/lib/auth/helpers";
+import { ensureDefaultCategories } from "@/lib/setup/categories";
+import { getCategories } from "@/lib/categories/queries";
+import { getHmrcCategories } from "@/lib/hmrc/queries";
 import { getReceipts } from "@/lib/receipts/queries";
 import { resolveDefaultTaxYear } from "@/lib/tax/tax-year";
 import { getTaxYears } from "@/lib/tax-years/queries";
@@ -12,11 +15,16 @@ async function ReceiptsContent() {
   let loadError: string | null = null;
   let receipts: Awaited<ReturnType<typeof getReceipts>> = [];
   let taxYears: Awaited<ReturnType<typeof getTaxYears>> = [];
+  let categories: Awaited<ReturnType<typeof getCategories>> = [];
+  let hmrcCategories: Awaited<ReturnType<typeof getHmrcCategories>> = [];
 
   try {
-    [receipts, taxYears] = await Promise.all([
+    await ensureDefaultCategories(user.id);
+    [receipts, taxYears, categories, hmrcCategories] = await Promise.all([
       getReceipts(user.id),
       getTaxYears(user.id),
+      getCategories(user.id),
+      getHmrcCategories(),
     ]);
   } catch (err) {
     loadError =
@@ -29,6 +37,8 @@ async function ReceiptsContent() {
     <ReceiptsVaultView
       receipts={receipts}
       taxYears={taxYears}
+      categories={categories}
+      hmrcCategories={hmrcCategories}
       defaultTaxYearId={defaultTaxYearId}
       loadError={loadError}
     />

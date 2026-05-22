@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import type { ReceiptStatus } from "@/lib/receipts/status";
 import {
   applyCategorizationRules,
   buildCategorizationMetadata,
@@ -36,11 +37,13 @@ import {
   extractReceiptFromBuffer,
 } from "@/lib/receipts/ocr/extract";
 import type { ReceiptOcrExtraction } from "@/lib/receipts/ocr/types";
+import { findSimilarReceipts } from "@/lib/receipts/duplicate-receipts";
 import { rankTransactionMatches } from "@/lib/receipts/match";
 import {
   getMatchableTransactions,
   getReceiptById,
 } from "@/lib/receipts/queries";
+import { deriveReceiptStatus } from "@/lib/receipts/status";
 import {
   buildReceiptCreationSuggestion,
   needsPaymentPrompt,
@@ -154,6 +157,13 @@ export async function captureReceipt(
   }
 
   const fields = applyExtractionToReceiptFields(extraction, tax_year_id);
+  const draftRow = {
+    merchant_name: fields.merchant_name,
+    total_amount: fields.total_amount,
+    receipt_date: fields.receipt_date,
+    status: "ready" as const,
+  };
+  const status = deriveReceiptStatus(draftRow, extraction);
 
   const { data, error } = await supabase
     .from("receipts")
@@ -165,6 +175,7 @@ export async function captureReceipt(
       file_size_bytes: file.size,
       notes: null,
       ...fields,
+      status,
     })
     .select("id")
     .single();
@@ -198,13 +209,16 @@ export async function getReceiptCaptureReview(
 
   const financeMode = profile?.finance_mode ?? "personal";
 
-  const transactions = await getMatchableTransactions(user.id, {
-    taxYearId: receipt.tax_year_id,
-    receiptId: receipt.id,
-  });
+  const [transactions, similarReceipts] = await Promise.all([
+    getMatchableTransactions(user.id, {
+      taxYearId: receipt.tax_year_id,
+    }),
+    findSimilarReceipts(user.id, receipt),
+  ]);
 
   const ranked = rankTransactionMatches(receipt, transactions, {
     limit: 12,
+    currentReceiptId: receipt.id,
   });
 
   const ocr =
@@ -249,10 +263,22 @@ export async function getReceiptCaptureReview(
     hmrcCategories,
   });
 
+  const receiptStatus = deriveReceiptStatus(
+    {
+      merchant_name: receipt.merchant_name,
+      total_amount: receipt.total_amount,
+      receipt_date: receipt.receipt_date,
+      status: receipt.status ?? "ready",
+      attached: Boolean(receipt.attached_transaction),
+    },
+    extraction
+  );
+
   return {
     success: true,
     data: {
       receipt,
+      receiptStatus,
       extraction,
       suggestedMatch: ranked.suggestedMatch,
       closestMatch: ranked.closestMatch,
@@ -261,6 +287,7 @@ export async function getReceiptCaptureReview(
       creationSuggestion,
       showPaymentPrompt: needsPaymentPrompt(receipt.payment_method),
       classificationLooksBusiness: classification.looksBusinessRelevant,
+      similarReceipts,
     },
   };
 }
@@ -498,4 +525,84 @@ export async function createTransactionFromReceipt(
 
   revalidateCapturePaths();
   return { success: true, data: { transactionId: data.id } };
+}
+
+export interface RetryReceiptOcrResult {
+  status: ReceiptStatus;
+  fieldsFound: string[];
+  merchant: string | null;
+  receiptDate: string | null;
+  totalAmount: number | null;
+}
+
+/** Re-run OCR on an existing receipt file and refresh metadata. */
+export async function retryReceiptOcr(
+  receiptId: string
+): Promise<ActionResult<RetryReceiptOcrResult>> {
+  const user = await requireAuth();
+  const receipt = await getReceiptById(user.id, receiptId);
+
+  if (!receipt) {
+    return { success: false, error: "Receipt not found." };
+  }
+
+  const supabase = await createClient();
+  const { data: fileData, error: downloadError } = await supabase.storage
+    .from(RECEIPTS_BUCKET)
+    .download(receipt.storage_path);
+
+  if (downloadError || !fileData) {
+    return {
+      success: false,
+      error: downloadError?.message ?? "Could not load receipt file.",
+    };
+  }
+
+  const buffer = Buffer.from(await fileData.arrayBuffer());
+  const mimeType =
+    receipt.mime_type ?? guessMimeType(receipt.original_filename ?? ".jpg");
+  const extraction = await extractReceiptFromBuffer(buffer, mimeType);
+
+  if (extraction.ocrError && !extraction.rawText?.trim()) {
+    return {
+      success: false,
+      error: extraction.ocrError,
+    };
+  }
+
+  const taxYearId = receipt.tax_year_id;
+  const fields = applyExtractionToReceiptFields(extraction, taxYearId);
+  const status = deriveReceiptStatus(
+    {
+      merchant_name: fields.merchant_name,
+      total_amount: fields.total_amount,
+      receipt_date: fields.receipt_date,
+      status: "ready",
+    },
+    extraction
+  );
+
+  const { error } = await supabase
+    .from("receipts")
+    .update({ ...fields, status })
+    .eq("id", receiptId)
+    .eq("user_id", user.id);
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  revalidateCapturePaths();
+  revalidatePath(`/receipts/review/${receiptId}`);
+
+  return {
+    success: true,
+    data: {
+      status,
+      fieldsFound: extraction.fieldsFound,
+      merchant: fields.merchant_name,
+      receiptDate: fields.receipt_date,
+      totalAmount: fields.total_amount,
+    },
+  };
 }

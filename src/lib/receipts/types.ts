@@ -2,12 +2,26 @@ import type { ReceiptPurpose } from "@/lib/receipts/classify";
 import type { ReceiptCreationSuggestion } from "@/lib/receipts/suggest";
 import type { ReceiptOcrExtraction } from "@/lib/receipts/ocr/types";
 import type { TaxYearRow } from "@/lib/tax-years/queries";
-import type { Database, FinanceMode, ReceiptPaymentMethod } from "@/types/database";
+import type {
+  Database,
+  FinanceMode,
+  ReceiptPaymentMethod,
+  ReceiptStatus,
+} from "@/types/database";
 
 export type { ReceiptPurpose };
 
 export type ReceiptRow = Database["public"]["Tables"]["receipts"]["Row"];
+export type { ReceiptStatus };
 export type { ReceiptPaymentMethod };
+
+export interface LinkedReceiptOnTransaction {
+  id: string;
+  merchant_name: string | null;
+  original_filename: string | null;
+  total_amount: number | null;
+  receipt_date: string | null;
+}
 
 export interface ReceiptAttachedTransaction {
   id: string;
@@ -18,6 +32,13 @@ export interface ReceiptAttachedTransaction {
   direction: string;
   is_business: boolean;
   receipt_id: string | null;
+  category_id: string | null;
+  hmrc_category_id: string | null;
+  tax_year_id: string | null;
+  account_id: string | null;
+  category_name?: string | null;
+  hmrc_category_name?: string | null;
+  linked_receipt?: LinkedReceiptOnTransaction | null;
   account: {
     id: string;
     name: string;
@@ -60,6 +81,7 @@ export interface ReceiptMatchDebug {
 
 export interface ReceiptCaptureReviewData {
   receipt: ReceiptWithRelations;
+  receiptStatus: ReceiptStatus;
   extraction: ReceiptOcrExtraction;
   suggestedMatch: ReceiptMatchCandidate | null;
   closestMatch: ReceiptMatchCandidate | null;
@@ -68,6 +90,8 @@ export interface ReceiptCaptureReviewData {
   creationSuggestion: ReceiptCreationSuggestion;
   showPaymentPrompt: boolean;
   classificationLooksBusiness: boolean;
+  /** Other uploads of the same purchase (duplicate scans). */
+  similarReceipts: import("@/lib/receipts/duplicate-receipts").SimilarReceiptInfo[];
 }
 
 export interface ReceiptWithRelations extends ReceiptRow {
@@ -85,12 +109,17 @@ export interface ReceiptFormInput {
   tax_year_id: string | null;
 }
 
+export type ReceiptMatchLinkState =
+  import("@/lib/receipts/match-link-state").ReceiptMatchLinkState;
+
 export interface ReceiptMatchCandidate {
   transaction: ReceiptAttachedTransaction;
   confidence: MatchConfidence;
   score: number;
   reasons: string[];
   debug: ReceiptMatchDebug;
+  linkState: ReceiptMatchLinkState;
+  linkedReceipt: import("@/lib/receipts/match-link-state").LinkedReceiptSummary | null;
 }
 
 export interface ActionResult<T = void> {

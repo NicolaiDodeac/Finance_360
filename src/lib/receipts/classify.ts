@@ -32,6 +32,14 @@ interface ReceiptPatternRule {
 
 const RECEIPT_PATTERNS: ReceiptPatternRule[] = [
   {
+    id: "groceries",
+    pattern: /\b(tesco|sainsbury|asda|aldi|lidl|morrisons|waitrose|co-?op)\b/i,
+    businessChoiceId: "stock_materials",
+    personalChoiceId: "groceries",
+    summaryTitle: "Groceries",
+    evidenceHint: "Receipt saved as proof.",
+  },
+  {
     id: "fuel",
     pattern:
       /\b(fuel|petrol|diesel|unleaded|shell|\bbp\b|esso|texaco|morrisons fuel|tesco fuel|asda fuel|sainsbury'?s fuel)\b/i,

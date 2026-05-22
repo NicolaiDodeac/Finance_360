@@ -8,7 +8,7 @@ import type {
 } from "@/lib/receipts/types";
 
 const ATTACHED_TRANSACTION_SELECT =
-  "id, transaction_date, description, merchant_name, amount, direction, is_business, receipt_id, account:accounts(id, name, account_type)";
+  "id, transaction_date, description, merchant_name, amount, direction, is_business, receipt_id, category_id, hmrc_category_id, tax_year_id, account_id, category:categories(id, name), hmrc:hmrc_categories(id, name), account:accounts(id, name, account_type), linked_receipt:receipts(id, merchant_name, original_filename, total_amount, receipt_date)";
 
 function attachTaxYears(
   rows: ReceiptRow[],
@@ -65,7 +65,7 @@ export async function getReceipts(
   const byReceiptId = new Map<string, ReceiptAttachedTransaction>();
   for (const tx of transactions ?? []) {
     if (tx.receipt_id) {
-      byReceiptId.set(tx.receipt_id, tx as ReceiptAttachedTransaction);
+      byReceiptId.set(tx.receipt_id, mapAttachedTransaction(tx));
     }
   }
 
@@ -112,8 +112,21 @@ export async function getReceiptById(
 
   return {
     ...withTaxYear,
-    attached_transaction:
-      (transaction as ReceiptAttachedTransaction | null) ?? null,
+    attached_transaction: transaction
+      ? mapAttachedTransaction(transaction)
+      : null,
+  };
+}
+
+function mapAttachedTransaction(tx: unknown): ReceiptAttachedTransaction {
+  const row = tx as ReceiptAttachedTransaction & {
+    category?: { name?: string } | null;
+    hmrc?: { name?: string } | null;
+  };
+  return {
+    ...row,
+    category_name: row.category?.name ?? null,
+    hmrc_category_name: row.hmrc?.name ?? null,
   };
 }
 
@@ -126,7 +139,7 @@ export async function getUnmatchedReceipts(
 
 export async function getMatchableTransactions(
   userId: string,
-  options?: { taxYearId?: string | null; receiptId?: string }
+  options?: { taxYearId?: string | null }
 ): Promise<ReceiptAttachedTransaction[]> {
   const supabase = await createClient();
 
@@ -139,7 +152,9 @@ export async function getMatchableTransactions(
     .limit(200);
 
   if (options?.taxYearId) {
-    query = query.eq("tax_year_id", options.taxYearId);
+    query = query.or(
+      `tax_year_id.eq.${options.taxYearId},tax_year_id.is.null`
+    );
   }
 
   const { data, error } = await query;
@@ -148,11 +163,7 @@ export async function getMatchableTransactions(
     throw new Error(error.message);
   }
 
-  return ((data ?? []) as ReceiptAttachedTransaction[]).filter((tx) => {
-    if (!tx.receipt_id) return true;
-    if (options?.receiptId && tx.receipt_id === options.receiptId) return true;
-    return false;
-  });
+  return (data ?? []) as ReceiptAttachedTransaction[];
 }
 
 export async function getUnattachedReceiptsForUser(

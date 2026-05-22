@@ -52,6 +52,42 @@ export async function getReviewDeferredTransactionCount(
   ).length;
 }
 
+/** Recent categorised transactions for merchant behaviour memory. */
+export async function getCategorisedTransactionsForMemory(
+  userId: string,
+  limit = 400
+) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("transactions")
+    .select(
+      "description, merchant_name, category_id, hmrc_category_id, is_business, direction, transaction_date, categories(name, slug)"
+    )
+    .eq("user_id", userId)
+    .not("category_id", "is", null)
+    .order("transaction_date", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []).map((row) => {
+    const cat = row.categories as { name: string; slug: string } | null;
+    return {
+      description: row.description as string | null,
+      merchant_name: row.merchant_name as string | null,
+      category_id: row.category_id as string,
+      hmrc_category_id: row.hmrc_category_id as string | null,
+      is_business: row.is_business as boolean,
+      direction: row.direction as import("@/types/database").TransactionDirection,
+      transaction_date: row.transaction_date as string,
+      categoryName: cat?.name ?? null,
+      categorySlug: cat?.slug ?? null,
+    };
+  });
+}
+
 export async function getUncategorisedTransactionCount(
   userId: string
 ): Promise<number> {

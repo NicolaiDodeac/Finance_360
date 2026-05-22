@@ -3,14 +3,26 @@
 import { useMemo, useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, Pencil, Search } from "lucide-react";
+import { Pencil, Search } from "lucide-react";
+import { ReceiptSimilarBanner } from "@/components/receipts/receipt-similar-banner";
+import {
+  MatchTransactionCard,
+  ReceiptMatchActions,
+} from "@/components/receipts/receipt-match-actions";
 import { ReceiptAttachPanel } from "@/components/receipts/receipt-attach-panel";
+import { ReceiptCategorisationReview } from "@/components/receipts/receipt-categorisation-review";
+import { ReceiptNeedsReviewPanel } from "@/components/receipts/receipt-needs-review-panel";
 import { ReceiptFileIcon } from "@/components/receipts/receipt-file-icon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  ReceiptDeleteButton,
+  confirmDeleteReceipt,
+} from "@/components/receipts/receipt-delete-button";
+import {
   attachReceiptToTransaction,
+  deleteReceipt,
   getReceiptPreviewUrl,
   updateReceiptMetadata,
 } from "@/lib/receipts/actions";
@@ -53,8 +65,15 @@ export function ReceiptCaptureReviewView({
   hmrcCategories,
 }: ReceiptCaptureReviewViewProps) {
   const router = useRouter();
-  const { receipt, extraction, suggestedMatch, closestMatch, financeMode } =
-    review;
+  const {
+    receipt,
+    receiptStatus,
+    extraction,
+    suggestedMatch,
+    closestMatch,
+    financeMode,
+    similarReceipts,
+  } = review;
   const isDev = process.env.NODE_ENV === "development";
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -135,15 +154,30 @@ export function ReceiptCaptureReviewView({
 
   const attached = receipt.attached_transaction;
 
-  function handleLinkMatch(match: ReceiptMatchCandidate) {
+  function handleLinkMatch(
+    match: ReceiptMatchCandidate,
+    replaceExistingProof = false
+  ) {
     setError(null);
     startTransition(async () => {
       const result = await attachReceiptToTransaction(
         receipt.id,
-        match.transaction.id
+        match.transaction.id,
+        { replaceExistingProof }
       );
       if (!result.success) {
-        setError(result.error ?? "Could not link receipt.");
+        if (result.data?.outcome === "existing_proof") {
+          setError(
+            `This transaction already has proof (${result.data.existingLabel}). Choose Replace proof below if you want this scan instead.`
+          );
+        } else {
+          setError(result.error ?? "Could not link receipt.");
+        }
+        return;
+      }
+      if (result.data?.outcome === "already_linked") {
+        router.push("/receipts");
+        router.refresh();
         return;
       }
       router.push("/receipts");
@@ -171,6 +205,20 @@ export function ReceiptCaptureReviewView({
     router.push("/receipts");
   }
 
+  function handleDelete() {
+    if (!confirmDeleteReceipt()) return;
+    setError(null);
+    startTransition(async () => {
+      const result = await deleteReceipt(receipt.id);
+      if (!result.success) {
+        setError(result.error ?? "Could not delete receipt.");
+        return;
+      }
+      router.push("/receipts");
+      router.refresh();
+    });
+  }
+
   function handleMetadataSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
@@ -185,6 +233,10 @@ export function ReceiptCaptureReviewView({
       setEditing(false);
       router.refresh();
     });
+  }
+
+  if (receiptStatus === "needs_review" && !attached) {
+    return <ReceiptNeedsReviewPanel receipt={receipt} />;
   }
 
   if (attached) {
@@ -203,6 +255,7 @@ export function ReceiptCaptureReviewView({
         <Button asChild variant="outline" className="w-full">
           <Link href="/receipts">Done</Link>
         </Button>
+        <ReceiptDeleteButton onDelete={handleDelete} disabled={isPending} />
       </div>
     );
   }
@@ -215,6 +268,12 @@ export function ReceiptCaptureReviewView({
   return (
     <div className="mx-auto max-w-lg space-y-5 pb-8">
       <ProofBanner />
+
+      <ReceiptSimilarBanner
+        similarReceipts={similarReceipts}
+        onDeleteCurrent={handleDelete}
+        deleteDisabled={isPending}
+      />
 
       {error ? (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
@@ -245,15 +304,23 @@ export function ReceiptCaptureReviewView({
             </a>
           ) : null}
         </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => setEditing((v) => !v)}
-        >
-          <Pencil className="h-3.5 w-3.5" />
-          Edit
-        </Button>
+        <div className="flex shrink-0 items-center gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={isPending}
+            onClick={() => setEditing((v) => !v)}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            Edit
+          </Button>
+          <ReceiptDeleteButton
+            variant="inline"
+            onDelete={handleDelete}
+            disabled={isPending}
+          />
+        </div>
       </div>
 
       {editing ? (
@@ -358,18 +425,26 @@ export function ReceiptCaptureReviewView({
 
       {hasBankMatch ? (
         <section className="space-y-3 rounded-xl border border-primary/30 bg-primary/5 p-4">
-          <p className="text-sm font-medium">Possible match found</p>
+          <p className="text-sm font-medium">
+            {suggestedMatch?.linkState === "linked_to_other_receipt"
+              ? "Matching transaction found"
+              : "Possible match found"}
+          </p>
+          {suggestedMatch?.linkState === "linked_to_other_receipt" ? (
+            <p className="text-xs text-muted-foreground">
+              This looks like a transaction you already saved proof for. You can
+              replace it with this scan or keep the existing file.
+            </p>
+          ) : null}
           <MatchTransactionCard match={suggestedMatch!} />
           {isDev ? <MatchDebugPanel match={suggestedMatch!} /> : null}
-          <Button
-            type="button"
-            className="h-12 w-full text-base"
-            disabled={isPending}
-            onClick={() => handleLinkMatch(suggestedMatch!)}
-          >
-            <Check className="h-4 w-4" />
-            Link receipt
-          </Button>
+          <ReceiptMatchActions
+            match={suggestedMatch!}
+            disabled={needsPayment}
+            isPending={isPending}
+            onLink={(replace) => handleLinkMatch(suggestedMatch!, replace)}
+            onCancel={() => router.push("/receipts")}
+          />
           <Button
             type="button"
             variant="outline"
@@ -377,7 +452,7 @@ export function ReceiptCaptureReviewView({
             disabled={isPending || needsPayment}
             onClick={handleCreateAndLink}
           >
-            Create separate cash transaction
+            Create separate transaction instead
           </Button>
         </section>
       ) : (
@@ -385,7 +460,9 @@ export function ReceiptCaptureReviewView({
           <section className="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-3">
             <p className="text-sm font-medium">No confident match found</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              We could not find a transaction that closely matches this receipt.
+              {similarReceipts.some((s) => s.hasLinkedTransaction)
+                ? "A similar receipt is already linked to a transaction — open it above, or create a new entry below."
+                : "We could not find a transaction that closely matches this receipt."}
             </p>
           </section>
 
@@ -397,68 +474,70 @@ export function ReceiptCaptureReviewView({
               </p>
               <MatchTransactionCard match={closestMatch} />
               {isDev ? <MatchDebugPanel match={closestMatch} /> : null}
-              <Button
-                type="button"
-                variant="outline"
-                className="h-12 w-full"
-                disabled={isPending}
-                onClick={() => handleLinkMatch(closestMatch)}
-              >
-                Link anyway
-              </Button>
+              <ReceiptMatchActions
+                match={closestMatch}
+                disabled={needsPayment}
+                isPending={isPending}
+                linkLabel="Link anyway"
+                onLink={(replace) => handleLinkMatch(closestMatch, replace)}
+                onCancel={() => setError(null)}
+              />
             </section>
           ) : null}
 
-          <section className="space-y-4 rounded-xl border border-border bg-card p-4">
-            <p className="text-sm font-medium">We can create this for you:</p>
-            <ul className="space-y-2 text-sm">
-              <li className="font-medium">{suggestion.summaryTitle}</li>
-              <li>{amountLabel}</li>
-              <li>{suggestion.paymentLabel}</li>
-              {suggestion.hmrcLabel ? (
-                <li>Tax category: {suggestion.hmrcLabel}</li>
-              ) : (
-                <li className="text-muted-foreground">
-                  {suggestion.taxCategoryNote}
-                </li>
-              )}
-              <li className="text-xs text-muted-foreground">
-                {suggestion.evidenceNote}
-              </li>
-            </ul>
-            <Button
-              type="button"
-              className="h-14 w-full text-base"
-              disabled={
-                isPending ||
-                needsPayment ||
-                receipt.total_amount === null ||
-                !receipt.receipt_date
-              }
-              onClick={handleCreateAndLink}
-            >
-              {isPending ? "Saving…" : "Create and link"}
-            </Button>
-            <div className="grid grid-cols-2 gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                className="h-11"
-                onClick={() => setEditing(true)}
-              >
-                Edit
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                className="h-11"
-                disabled={isPending}
-                onClick={handleSkip}
-              >
-                Skip for now
-              </Button>
-            </div>
-          </section>
+          <ReceiptCategorisationReview
+            merchant={receipt.merchant_name}
+            amount={
+              receipt.total_amount !== null
+                ? Number(receipt.total_amount)
+                : null
+            }
+            receiptDate={receipt.receipt_date}
+            paymentLabel={suggestion.paymentLabel}
+            purpose={purpose}
+            suggestion={suggestion}
+            categories={categories}
+            hmrcCategories={hmrcCategories}
+            disabled={
+              isPending ||
+              needsPayment ||
+              receipt.total_amount === null ||
+              !receipt.receipt_date
+            }
+            isPending={isPending}
+            onConfirm={handleCreateAndLink}
+            purposePanel={
+              showBusinessPurpose ? (
+                <div className="grid gap-2">
+                  {PURPOSE_OPTIONS.map((opt) => (
+                    <label
+                      key={opt.value}
+                      className="flex cursor-pointer items-center gap-3 rounded-lg border border-border px-3 py-3 has-[:checked]:border-primary"
+                    >
+                      <input
+                        type="radio"
+                        name="purpose-change"
+                        value={opt.value}
+                        checked={purpose === opt.value}
+                        disabled={isPending}
+                        onChange={() => setPurpose(opt.value)}
+                      />
+                      <span className="text-sm">{opt.label}</span>
+                    </label>
+                  ))}
+                </div>
+              ) : undefined
+            }
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            className="h-11 w-full"
+            disabled={isPending}
+            onClick={handleSkip}
+          >
+            Continue later
+          </Button>
         </>
       )}
 
@@ -522,9 +601,12 @@ export function ReceiptCaptureReviewView({
         />
       ) : null}
 
-      <Button asChild variant="ghost" className="w-full">
-        <Link href="/receipts">Back to receipts</Link>
-      </Button>
+      <div className="space-y-2 border-t border-border pt-4">
+        <ReceiptDeleteButton onDelete={handleDelete} disabled={isPending} />
+        <Button asChild variant="ghost" className="h-11 w-full">
+          <Link href="/receipts">Back to receipts</Link>
+        </Button>
+      </div>
     </div>
   );
 }
@@ -534,23 +616,6 @@ function ProofBanner() {
     <p className="rounded-lg bg-muted/50 px-3 py-2 text-center text-sm text-muted-foreground">
       Receipt saved as proof.
     </p>
-  );
-}
-
-function MatchTransactionCard({ match }: { match: ReceiptMatchCandidate }) {
-  return (
-    <div className="rounded-lg border border-border bg-card px-3 py-3 text-sm">
-      <p className="font-medium">
-        {match.transaction.merchant_name ??
-          match.transaction.description ??
-          "Transaction"}
-      </p>
-      <p className="text-xs text-muted-foreground">
-        {formatMoney(Number(match.transaction.amount))} ·{" "}
-        {formatTransactionDate(match.transaction.transaction_date)}
-        {match.reasons.length > 0 ? ` · ${match.reasons.join(", ")}` : ""}
-      </p>
-    </div>
   );
 }
 

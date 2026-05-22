@@ -1,3 +1,4 @@
+import { resolveMatchLinkState } from "@/lib/receipts/match-link-state";
 import type {
   ReceiptMatchCandidate,
   ReceiptMatchDebug,
@@ -220,13 +221,21 @@ function paymentSortBoost(
   return 0;
 }
 
+type ScoredTransactionMatch = {
+  transaction: ReceiptAttachedTransaction;
+  confidence: MatchConfidence;
+  score: number;
+  reasons: string[];
+  debug: ReceiptMatchDebug;
+};
+
 export function scoreTransactionForReceipt(
   receipt: Pick<
     ReceiptRow,
     "merchant_name" | "receipt_date" | "total_amount" | "payment_method"
   >,
   transaction: ReceiptAttachedTransaction
-): ReceiptMatchCandidate {
+): ScoredTransactionMatch {
   const receiptAmount =
     receipt.total_amount !== null ? Number(receipt.total_amount) : null;
   const amountDiffValue = amountDiff(receiptAmount, Number(transaction.amount));
@@ -295,18 +304,35 @@ export interface RankedReceiptMatches {
   candidates: ReceiptMatchCandidate[];
 }
 
+function withLinkState(
+  candidate: ScoredTransactionMatch,
+  currentReceiptId: string
+): ReceiptMatchCandidate {
+  const { linkState, linkedReceipt } = resolveMatchLinkState(
+    currentReceiptId,
+    candidate.transaction
+  );
+  return { ...candidate, linkState, linkedReceipt };
+}
+
 export function rankTransactionMatches(
   receipt: Pick<
     ReceiptRow,
     "merchant_name" | "receipt_date" | "total_amount" | "payment_method"
   >,
   transactions: ReceiptAttachedTransaction[],
-  options?: { limit?: number }
+  options?: { limit?: number; currentReceiptId?: string }
 ): RankedReceiptMatches {
   const limit = options?.limit ?? 12;
+  const currentReceiptId = options?.currentReceiptId ?? "";
 
   const scored = transactions
-    .map((transaction) => scoreTransactionForReceipt(receipt, transaction))
+    .map((transaction) =>
+      withLinkState(
+        scoreTransactionForReceipt(receipt, transaction),
+        currentReceiptId
+      )
+    )
     .filter((item) => item.confidence !== "none")
     .sort((a, b) => {
       const confDiff =
@@ -315,12 +341,27 @@ export function rankTransactionMatches(
       return b.score - a.score;
     });
 
-  const suggestedMatch =
-    scored.find(
-      (item) => item.confidence === "strong" || item.confidence === "medium"
-    ) ?? null;
+  const pickSuggested = (): ReceiptMatchCandidate | null => {
+    const eligible = scored.filter(
+      (item) =>
+        (item.confidence === "strong" || item.confidence === "medium") &&
+        item.linkState !== "linked_to_this_receipt"
+    );
+    return (
+      eligible.find((item) => item.linkState === "linked_to_other_receipt") ??
+      eligible[0] ??
+      null
+    );
+  };
 
-  const closestMatch = scored.find((item) => item.confidence === "weak") ?? null;
+  const suggestedMatch = pickSuggested();
+
+  const closestMatch =
+    scored.find(
+      (item) =>
+        item.confidence === "weak" &&
+        item.linkState !== "linked_to_this_receipt"
+    ) ?? null;
 
   return {
     suggestedMatch,
@@ -347,6 +388,10 @@ export function assertConservativeReceiptMatching(): void {
     direction: "expense",
     is_business: false,
     receipt_id: null,
+    category_id: null,
+    hmrc_category_id: null,
+    tax_year_id: null,
+    account_id: "a1",
     account: { id: "a1", name: "Card", account_type: "credit_card" },
   });
 
@@ -365,12 +410,57 @@ export function assertConservativeReceiptMatching(): void {
     direction: "expense",
     is_business: false,
     receipt_id: null,
+    category_id: null,
+    hmrc_category_id: null,
+    tax_year_id: null,
+    account_id: "a2",
     account: { id: "a2", name: "Card", account_type: "credit_card" },
   });
 
   if (exact.confidence !== "strong") {
     throw new Error(
       `Same Tesco transaction should be strong match (got ${exact.confidence})`
+    );
+  }
+
+  const ranked = rankTransactionMatches(
+    receipt,
+    [
+      exact.transaction,
+      {
+        id: "tx-tesco-linked",
+        transaction_date: "2026-05-22",
+        description: "TESCO",
+        merchant_name: "Tesco",
+        amount: 7.56,
+        direction: "expense",
+        is_business: false,
+        receipt_id: "other-receipt-id",
+        category_id: null,
+        hmrc_category_id: null,
+        tax_year_id: null,
+        account_id: "a2",
+        linked_receipt: {
+          id: "other-receipt-id",
+          merchant_name: "Tesco",
+          original_filename: "scan1.jpg",
+          total_amount: 7.56,
+          receipt_date: "2026-05-22",
+        },
+        account: { id: "a2", name: "Card", account_type: "credit_card" },
+      },
+    ],
+    { currentReceiptId: "new-receipt-id" }
+  );
+
+  if (!ranked.suggestedMatch) {
+    throw new Error(
+      "Transaction with existing proof should still appear as suggested match"
+    );
+  }
+  if (ranked.suggestedMatch.linkState !== "linked_to_other_receipt") {
+    throw new Error(
+      `Expected linked_to_other_receipt (got ${ranked.suggestedMatch.linkState})`
     );
   }
 }

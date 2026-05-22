@@ -61,7 +61,8 @@ export function businessExpenseChoiceFromCategorySlug(
   return BUSINESS_EXPENSE_SLUG[slug] ?? null;
 }
 
-function slugToChoice(
+/** Map a stored category slug to a flow choice for the given purpose. */
+export function choiceIdFromCategorySlug(
   slug: string | undefined,
   purpose: CategorisePurpose,
   direction: TransactionDirection
@@ -127,7 +128,7 @@ export function prefillFromSuggestion(
     ? "business"
     : "personal";
 
-  const choiceId = slugToChoice(category.slug, purpose, direction);
+  const choiceId = choiceIdFromCategorySlug(category.slug, purpose, direction);
   if (!choiceId) return null;
 
   return {

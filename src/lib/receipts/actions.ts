@@ -17,10 +17,12 @@ import {
   guessMimeType,
   isAllowedReceiptFile,
 } from "@/lib/receipts/storage";
+import { parseMoneyAmount } from "@/lib/receipts/ocr/parse-amount";
+import { deriveReceiptStatus } from "@/lib/receipts/status";
 import type { ActionResult, ReceiptFormInput } from "@/lib/receipts/types";
 import type { ReceiptPaymentMethod } from "@/types/database";
 import { createClient } from "@/lib/supabase/server";
-import { getTaxYears } from "@/lib/tax-years/queries";
+import { findTaxYearForDate, getTaxYears } from "@/lib/tax-years/queries";
 
 const REVALIDATE_PATHS = ["/receipts", "/transactions", "/tax"] as const;
 
@@ -34,7 +36,10 @@ function parseOptionalAmount(
   value: FormDataEntryValue | null
 ): number | null {
   if (value === null || value === "") return null;
-  const num = Number(value);
+  const raw = String(value).trim();
+  const parsed = parseMoneyAmount(raw);
+  if (parsed !== null) return parsed;
+  const num = Number(raw);
   if (!Number.isFinite(num) || num < 0) return null;
   return num;
 }
@@ -203,6 +208,13 @@ export async function updateReceiptMetadata(
   }
 
   const supabase = await createClient();
+  const status = deriveReceiptStatus({
+    merchant_name: metadata.merchant_name || null,
+    receipt_date: metadata.receipt_date || null,
+    total_amount: metadata.total_amount,
+    status: "ready",
+  });
+
   const { error } = await supabase
     .from("receipts")
     .update({
@@ -213,6 +225,7 @@ export async function updateReceiptMetadata(
       payment_method: metadata.payment_method,
       notes: metadata.notes || null,
       tax_year_id: taxYearId,
+      status,
     })
     .eq("id", receiptId)
     .eq("user_id", user.id);
@@ -222,13 +235,142 @@ export async function updateReceiptMetadata(
   }
 
   revalidateReceiptPaths();
+  revalidatePath("/transactions");
   return { success: true };
 }
 
+/** Save receipt proof fields and optionally sync the linked transaction. */
+export async function saveReceiptVault(
+  receiptId: string,
+  formData: FormData
+): Promise<ActionResult> {
+  const user = await requireAuth();
+  const { metadata, taxYearId: taxYearFromForm, error: metaError } =
+    parseReceiptMetadata(formData);
+
+  if (metaError) {
+    return { success: false, error: metaError };
+  }
+
+  const receipt = await getReceiptById(user.id, receiptId);
+  if (!receipt) {
+    return { success: false, error: "Receipt not found." };
+  }
+
+  const taxYears = await getTaxYears(user.id);
+  const taxYearId =
+    taxYearFromForm ??
+    (metadata.receipt_date
+      ? findTaxYearForDate(taxYears, metadata.receipt_date)?.id ?? null
+      : null);
+
+  const supabase = await createClient();
+  const status = deriveReceiptStatus(
+    {
+      merchant_name: metadata.merchant_name || null,
+      receipt_date: metadata.receipt_date || null,
+      total_amount: metadata.total_amount,
+      status: "ready",
+      attached: Boolean(receipt.attached_transaction),
+    },
+    null
+  );
+
+  const { error: receiptError } = await supabase
+    .from("receipts")
+    .update({
+      merchant_name: metadata.merchant_name || null,
+      receipt_date: metadata.receipt_date || null,
+      total_amount: metadata.total_amount,
+      vat_amount: metadata.vat_amount,
+      payment_method: metadata.payment_method,
+      notes: metadata.notes || null,
+      tax_year_id: taxYearId,
+      status,
+    })
+    .eq("id", receiptId)
+    .eq("user_id", user.id);
+
+  if (receiptError) {
+    return { success: false, error: receiptError.message };
+  }
+
+  const syncTransaction = formData.get("sync_linked_transaction") === "1";
+  const transactionId = String(formData.get("linked_transaction_id") ?? "").trim();
+
+  if (syncTransaction && transactionId && receipt.attached_transaction) {
+    const categoryId =
+      String(formData.get("category_id") ?? "").trim() || null;
+    const hmrcCategoryId =
+      String(formData.get("hmrc_category_id") ?? "").trim() || null;
+    const isBusiness = formData.get("is_business") === "on";
+    const businessUseRaw = String(
+      formData.get("business_use_percent") ?? ""
+    ).trim();
+    const businessUsePercent =
+      isBusiness && businessUseRaw !== ""
+        ? Math.min(100, Math.max(0, Number(businessUseRaw)))
+        : isBusiness
+          ? 100
+          : null;
+
+    const { data: existingTx, error: txFetchError } = await supabase
+      .from("transactions")
+      .select("account_id, direction, raw_import_data")
+      .eq("id", transactionId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (txFetchError || !existingTx) {
+      return { success: false, error: "Linked transaction not found." };
+    }
+
+    const amount = metadata.total_amount ?? Number(receipt.attached_transaction.amount);
+    const merchant = metadata.merchant_name?.trim() || receipt.attached_transaction.merchant_name;
+    const txDate = metadata.receipt_date || receipt.attached_transaction.transaction_date;
+
+    const { error: txError } = await supabase
+      .from("transactions")
+      .update({
+        merchant_name: merchant,
+        description: merchant,
+        transaction_date: txDate,
+        amount,
+        category_id: categoryId,
+        hmrc_category_id: isBusiness ? hmrcCategoryId : null,
+        is_business: isBusiness,
+        business_use_percent: businessUsePercent,
+        tax_year_id: taxYearId,
+      })
+      .eq("id", transactionId)
+      .eq("user_id", user.id);
+
+    if (txError) {
+      return { success: false, error: txError.message };
+    }
+  }
+
+  revalidateReceiptPaths();
+  revalidatePath("/transactions");
+  revalidatePath("/dashboard");
+  revalidatePath("/tax");
+  return { success: true };
+}
+
+export type AttachReceiptResult =
+  | { outcome: "linked" }
+  | { outcome: "already_linked" }
+  | {
+      outcome: "existing_proof";
+      existingReceiptId: string;
+      existingLabel: string;
+    };
+
 export async function attachReceiptToTransaction(
   receiptId: string,
-  transactionId: string
-): Promise<ActionResult> {
+  transactionId: string,
+  options?: { replaceExistingProof?: boolean }
+): Promise<ActionResult<AttachReceiptResult>> {
   const user = await requireAuth();
   const supabase = await createClient();
 
@@ -248,6 +390,43 @@ export async function attachReceiptToTransaction(
     return { success: false, error: "Transaction not found." };
   }
 
+  const existingReceiptId = transaction.receipt_id as string | null;
+
+  if (existingReceiptId === receiptId) {
+    await supabase
+      .from("receipts")
+      .update({ status: "linked" })
+      .eq("id", receiptId)
+      .eq("user_id", user.id);
+    revalidateReceiptPaths();
+    return { success: true, data: { outcome: "already_linked" } };
+  }
+
+  if (existingReceiptId && !options?.replaceExistingProof) {
+    const existing = await getReceiptById(user.id, existingReceiptId);
+    const label =
+      existing?.merchant_name?.trim() ||
+      existing?.original_filename?.trim() ||
+      "another receipt";
+    return {
+      success: false,
+      error: "This transaction already has proof attached.",
+      data: {
+        outcome: "existing_proof",
+        existingReceiptId,
+        existingLabel: label,
+      },
+    };
+  }
+
+  if (existingReceiptId && existingReceiptId !== receiptId) {
+    await supabase
+      .from("receipts")
+      .update({ status: "ready" })
+      .eq("id", existingReceiptId)
+      .eq("user_id", user.id);
+  }
+
   await supabase
     .from("transactions")
     .update({ receipt_id: null })
@@ -264,8 +443,14 @@ export async function attachReceiptToTransaction(
     return { success: false, error: error.message };
   }
 
+  await supabase
+    .from("receipts")
+    .update({ status: "linked" })
+    .eq("id", receiptId)
+    .eq("user_id", user.id);
+
   revalidateReceiptPaths();
-  return { success: true };
+  return { success: true, data: { outcome: "linked" } };
 }
 
 export async function detachReceiptFromTransaction(
@@ -288,7 +473,10 @@ export async function detachReceiptFromTransaction(
   return { success: true };
 }
 
-export async function deleteReceipt(receiptId: string): Promise<ActionResult> {
+export async function deleteReceipt(
+  receiptId: string,
+  options?: { deleteLinkedTransaction?: boolean }
+): Promise<ActionResult> {
   const user = await requireAuth();
   const supabase = await createClient();
 
@@ -297,11 +485,25 @@ export async function deleteReceipt(receiptId: string): Promise<ActionResult> {
     return { success: false, error: "Receipt not found." };
   }
 
-  await supabase
-    .from("transactions")
-    .update({ receipt_id: null })
-    .eq("user_id", user.id)
-    .eq("receipt_id", receiptId);
+  const linkedTxId = receipt.attached_transaction?.id ?? null;
+
+  if (options?.deleteLinkedTransaction && linkedTxId) {
+    const { error: txDeleteError } = await supabase
+      .from("transactions")
+      .delete()
+      .eq("id", linkedTxId)
+      .eq("user_id", user.id);
+
+    if (txDeleteError) {
+      return { success: false, error: txDeleteError.message };
+    }
+  } else {
+    await supabase
+      .from("transactions")
+      .update({ receipt_id: null })
+      .eq("user_id", user.id)
+      .eq("receipt_id", receiptId);
+  }
 
   const { error: deleteRowError } = await supabase
     .from("receipts")
@@ -316,6 +518,8 @@ export async function deleteReceipt(receiptId: string): Promise<ActionResult> {
   await supabase.storage.from(RECEIPTS_BUCKET).remove([receipt.storage_path]);
 
   revalidateReceiptPaths();
+  revalidatePath("/transactions");
+  revalidatePath("/dashboard");
   return { success: true };
 }
 
@@ -331,10 +535,11 @@ export async function getReceiptMatchCandidates(
 
   const transactions = await getMatchableTransactions(user.id, {
     taxYearId: receipt.tax_year_id,
-    receiptId: receipt.id,
   });
 
-  const ranked = rankTransactionMatches(receipt, transactions);
+  const ranked = rankTransactionMatches(receipt, transactions, {
+    currentReceiptId: receipt.id,
+  });
   return { success: true, data: ranked.candidates };
 }
 
@@ -363,7 +568,7 @@ export async function getReceiptPreviewUrl(
 export async function uploadAndAttachReceipt(
   transactionId: string,
   formData: FormData
-): Promise<ActionResult> {
+): Promise<ActionResult<AttachReceiptResult>> {
   const upload = await uploadReceipt(formData);
   if (!upload.success || !upload.data?.id) {
     return { success: false, error: upload.error ?? "Upload failed." };

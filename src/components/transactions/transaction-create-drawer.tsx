@@ -12,7 +12,8 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
-import { TransactionFormFields } from "@/components/transactions/transaction-form-fields";
+import { TransactionCategorisationReview } from "@/components/transactions/transaction-categorisation-review";
+import { TransactionCoreFields } from "@/components/transactions/transaction-core-fields";
 import { createTransaction } from "@/lib/transactions/actions";
 import { emptyTransactionForm } from "@/lib/transactions/form";
 import type { AccountRow } from "@/lib/accounts/queries";
@@ -70,7 +71,11 @@ export function TransactionCreateDrawer({
   return (
     <Drawer open={open} onOpenChange={handleOpenChange}>
       <DrawerContent>
-        <form onSubmit={handleSubmit} className="flex h-full flex-col">
+        <form
+          id="transaction-create-form"
+          onSubmit={handleSubmit}
+          className="flex h-full flex-col"
+        >
           <DrawerHeader>
             <DrawerTitle>Add transaction</DrawerTitle>
             <DrawerDescription>
@@ -84,14 +89,29 @@ export function TransactionCreateDrawer({
                 {error}
               </p>
             )}
-            <TransactionFormFields
+            <TransactionCoreFields
               value={form}
               onChange={setForm}
               accounts={accounts}
-              categories={categories}
-              hmrcCategories={hmrcCategories}
               disabled={isPending}
             />
+            <div className="mt-6">
+              <TransactionCategorisationReview
+                form={form}
+                onChange={setForm}
+                categories={categories}
+                hmrcCategories={hmrcCategories}
+                disabled={isPending}
+                onSave={() => {
+                  const el = document.getElementById(
+                    "transaction-create-form"
+                  ) as HTMLFormElement | null;
+                  el?.requestSubmit();
+                }}
+                isPending={isPending}
+                confirmLabel={isPending ? "Saving…" : "Save transaction"}
+              />
+            </div>
           </DrawerBody>
 
           <DrawerFooter>
@@ -102,9 +122,6 @@ export function TransactionCreateDrawer({
               onClick={() => handleOpenChange(false)}
             >
               Cancel
-            </Button>
-            <Button type="submit" disabled={isPending}>
-              {isPending ? "Saving…" : "Save transaction"}
             </Button>
           </DrawerFooter>
         </form>

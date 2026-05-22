@@ -26,6 +26,13 @@ export type ReceiptPaymentMethod =
 
 export type ReceiptSource = "manual" | "receipt_capture";
 
+export type ReceiptStatus =
+  | "processing"
+  | "needs_review"
+  | "ready"
+  | "linked"
+  | "archived";
+
 export type SpaceType = "personal" | "household" | "business";
 
 export type SpaceMemberRole = "owner" | "admin" | "member";
@@ -441,6 +448,7 @@ export interface Database {
           ocr_data: Record<string, unknown> | null;
           payment_method: ReceiptPaymentMethod | null;
           source: ReceiptSource;
+          status: ReceiptStatus;
           created_at: string;
           updated_at: string;
         };
@@ -460,6 +468,7 @@ export interface Database {
           ocr_data?: Record<string, unknown> | null;
           payment_method?: ReceiptPaymentMethod | null;
           source?: ReceiptSource;
+          status?: ReceiptStatus;
         };
         Update: {
           storage_path?: string;
@@ -475,6 +484,7 @@ export interface Database {
           ocr_data?: Record<string, unknown> | null;
           payment_method?: ReceiptPaymentMethod | null;
           source?: ReceiptSource;
+          status?: ReceiptStatus;
         };
       };
       categorization_rules: {

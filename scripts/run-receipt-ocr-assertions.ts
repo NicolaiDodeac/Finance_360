@@ -1,3 +1,4 @@
+import { parseMoneyAmount } from "../src/lib/receipts/ocr/parse-amount";
 import { parseReceiptText } from "../src/lib/receipts/ocr/parse-text";
 import {
   detectKnownMerchant,
@@ -60,5 +61,26 @@ assert(
   garbageOnly.merchant === null || garbageOnly.source !== "known",
   "pure garbage without brand token should not be a known merchant"
 );
+
+const TESCO_FULL = `
+TESCO
+Telford Hadley Centre Express
+22/05/2026 08:52
+Subtotal £18.20
+Savings -£1.80
+TOTAL £16.40
+Card £16.40
+Mastercard Credit
+`;
+const tescoFull = parseReceiptText(TESCO_FULL);
+assert(tescoFull.merchant === "Tesco", "Tesco full: merchant");
+assert(tescoFull.receiptDate === "2026-05-22", `Tesco full: date ${tescoFull.receiptDate}`);
+assert(
+  tescoFull.totalAmount === 16.4,
+  `Tesco full: total should be 16.40 not subtotal 18.20, got ${tescoFull.totalAmount}`
+);
+
+assert(parseMoneyAmount("16,40") === 16.4, "comma decimal");
+assert(parseMoneyAmount("£16.40") === 16.4, "pound amount");
 
 console.log("Receipt OCR assertions passed.");
