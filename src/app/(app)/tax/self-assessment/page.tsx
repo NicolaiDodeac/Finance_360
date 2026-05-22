@@ -14,14 +14,15 @@ interface SelfAssessmentPageProps {
 async function SelfAssessmentContent({
   searchParams,
 }: {
-  searchParams: Awaited<SelfAssessmentPageProps["searchParams"]>;
+  searchParams: SelfAssessmentPageProps["searchParams"];
 }) {
+  const resolved = await searchParams;
   const user = await requireAuth();
   let loadError: string | null = null;
   let data: Awaited<ReturnType<typeof getSelfAssessmentPrepData>> | null = null;
 
   try {
-    data = await getSelfAssessmentPrepData(user.id, searchParams.taxYear);
+    data = await getSelfAssessmentPrepData(user.id, resolved.taxYear);
   } catch (err) {
     loadError =
       err instanceof Error
@@ -41,11 +42,9 @@ async function SelfAssessmentContent({
   return <SaPrepView data={data} loadError={loadError} />;
 }
 
-export default async function SelfAssessmentPage({
+export default function SelfAssessmentPage({
   searchParams,
 }: SelfAssessmentPageProps) {
-  const resolvedSearchParams = await searchParams;
-
   return (
     <>
       <PageHeader
@@ -53,7 +52,7 @@ export default async function SelfAssessmentPage({
         description="A step-by-step assistant to prepare your self-employment figures before you enter them into HMRC."
       />
       <Suspense fallback={<SaPrepLoading />}>
-        <SelfAssessmentContent searchParams={resolvedSearchParams} />
+        <SelfAssessmentContent searchParams={searchParams} />
       </Suspense>
     </>
   );

@@ -14,14 +14,15 @@ interface TaxHubPageProps {
 async function TaxHubContent({
   searchParams,
 }: {
-  searchParams: Awaited<TaxHubPageProps["searchParams"]>;
+  searchParams: TaxHubPageProps["searchParams"];
 }) {
+  const resolved = await searchParams;
   const user = await requireAuth();
   let loadError: string | null = null;
   let data: Awaited<ReturnType<typeof getTaxHubData>> | null = null;
 
   try {
-    data = await getTaxHubData(user.id, searchParams.taxYear);
+    data = await getTaxHubData(user.id, resolved.taxYear);
   } catch (err) {
     loadError =
       err instanceof Error ? err.message : "Failed to load tax overview.";
@@ -34,9 +35,7 @@ async function TaxHubContent({
   return <TaxHubView data={data} loadError={loadError} />;
 }
 
-export default async function TaxHubPage({ searchParams }: TaxHubPageProps) {
-  const resolvedSearchParams = await searchParams;
-
+export default function TaxHubPage({ searchParams }: TaxHubPageProps) {
   return (
     <>
       <PageHeader
@@ -44,7 +43,7 @@ export default async function TaxHubPage({ searchParams }: TaxHubPageProps) {
         description="A calm overview of your self-employed income and expenses for UK tax preparation."
       />
       <Suspense fallback={<TaxHubLoading />}>
-        <TaxHubContent searchParams={resolvedSearchParams} />
+        <TaxHubContent searchParams={searchParams} />
       </Suspense>
     </>
   );

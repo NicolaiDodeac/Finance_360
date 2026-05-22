@@ -21,10 +21,11 @@ interface TransactionsPageProps {
 async function TransactionsContent({
   searchParams,
 }: {
-  searchParams: Awaited<TransactionsPageProps["searchParams"]>;
+  searchParams: TransactionsPageProps["searchParams"];
 }) {
+  const resolvedSearchParams = await searchParams;
   const user = await requireAuth();
-  const filters = parseTransactionSearchParams(searchParams);
+  const filters = parseTransactionSearchParams(resolvedSearchParams);
 
   let loadError: string | null = null;
   let transactions: Awaited<ReturnType<typeof getTransactions>> = [];
@@ -85,11 +86,9 @@ function TransactionsLoading() {
   );
 }
 
-export default async function TransactionsPage({
+export default function TransactionsPage({
   searchParams,
 }: TransactionsPageProps) {
-  const resolvedSearchParams = await searchParams;
-
   return (
     <>
       <PageHeader
@@ -97,7 +96,7 @@ export default async function TransactionsPage({
         description="View and manage all your income and spending."
       />
       <Suspense fallback={<TransactionsLoading />}>
-        <TransactionsContent searchParams={resolvedSearchParams} />
+        <TransactionsContent searchParams={searchParams} />
       </Suspense>
     </>
   );

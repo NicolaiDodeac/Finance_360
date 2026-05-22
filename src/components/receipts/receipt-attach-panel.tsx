@@ -39,13 +39,24 @@ export function ReceiptAttachPanel({
     let cancelled = false;
     setLoadingCandidates(true);
 
-    getReceiptMatchCandidates(receipt.id).then((result) => {
-      if (cancelled) return;
-      if (result.success && result.data) {
-        setCandidates(result.data);
-      }
-      setLoadingCandidates(false);
-    });
+    getReceiptMatchCandidates(receipt.id)
+      .then((result) => {
+        if (cancelled) return;
+        if (result.success && result.data) {
+          setCandidates(result.data);
+          setError(null);
+        } else {
+          setError(result.error ?? "Could not load transaction matches.");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setError("Could not load transaction matches. Try again.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingCandidates(false);
+      });
 
     return () => {
       cancelled = true;

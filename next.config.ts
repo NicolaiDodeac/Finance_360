@@ -21,6 +21,10 @@ const nextConfig: NextConfig = {
       "./node_modules/pdf-parse/dist/worker/**/*",
       "./node_modules/tesseract.js/dist/**/*",
     ],
+    "/receipts/review/[id]": [
+      "./node_modules/pdf-parse/dist/worker/**/*",
+      "./node_modules/tesseract.js/dist/**/*",
+    ],
   },
   serverExternalPackages: ["pdf-parse", "@napi-rs/canvas", "tesseract.js"],
 };

@@ -27,12 +27,20 @@ export function useReceiptCapture(options?: UseReceiptCaptureOptions) {
     if (yearId) formData.set("tax_year_id", yearId);
 
     startTransition(async () => {
-      const result = await captureReceipt(formData);
-      if (!result.success || !result.data?.id) {
-        setError(result.error ?? "Could not process receipt.");
-        return;
+      try {
+        const result = await captureReceipt(formData);
+        if (!result.success || !result.data?.id) {
+          setError(result.error ?? "Could not upload receipt.");
+          return;
+        }
+        router.push(`/receipts/review/${result.data.id}`);
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Could not upload receipt. Try again or use Upload instead of camera."
+        );
       }
-      router.push(`/receipts/review/${result.data.id}`);
     });
   }
 

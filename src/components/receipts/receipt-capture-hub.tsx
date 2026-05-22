@@ -54,7 +54,7 @@ export function ReceiptCaptureHub({
         onClick={openCamera}
       >
         <Camera className="h-5 w-5" />
-        {isPending ? "Reading receipt…" : "Take photo"}
+        {isPending ? "Uploading…" : "Take photo"}
       </Button>
 
       <Button

@@ -533,14 +533,24 @@ export async function getReceiptMatchCandidates(
     return { success: false, error: "Receipt not found." };
   }
 
-  const transactions = await getMatchableTransactions(user.id, {
-    taxYearId: receipt.tax_year_id,
-  });
+  try {
+    const transactions = await getMatchableTransactions(user.id, {
+      taxYearId: receipt.tax_year_id,
+    });
 
-  const ranked = rankTransactionMatches(receipt, transactions, {
-    currentReceiptId: receipt.id,
-  });
-  return { success: true, data: ranked.candidates };
+    const ranked = rankTransactionMatches(receipt, transactions, {
+      currentReceiptId: receipt.id,
+    });
+    return { success: true, data: ranked.candidates };
+  } catch (err) {
+    return {
+      success: false,
+      error:
+        err instanceof Error
+          ? err.message
+          : "Could not load transactions to match.",
+    };
+  }
 }
 
 export async function getReceiptPreviewUrl(
