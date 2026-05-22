@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ReceiptDetailDrawer } from "@/components/receipts/receipt-detail-drawer";
 import { ReceiptListItem } from "@/components/receipts/receipt-list-item";
 import { ReceiptUnmatchedSection } from "@/components/receipts/receipt-unmatched-section";
+import { ReceiptCaptureHub } from "@/components/receipts/receipt-capture-hub";
 import { ReceiptUploadForm } from "@/components/receipts/receipt-upload-form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { ReceiptWithRelations } from "@/lib/receipts/types";
@@ -26,6 +27,14 @@ export function ReceiptsVaultView({
   const router = useRouter();
   const [selected, setSelected] = useState<ReceiptWithRelations | null>(null);
 
+  function handleReceiptSelect(receipt: ReceiptWithRelations) {
+    if (!receipt.attached_transaction) {
+      router.push(`/receipts/review/${receipt.id}`);
+      return;
+    }
+    setSelected(receipt);
+  }
+
   const unmatched = useMemo(
     () => receipts.filter((r) => !r.attached_transaction),
     [receipts]
@@ -38,14 +47,10 @@ export function ReceiptsVaultView({
 
   return (
     <>
-      <div className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-        <p className="font-medium text-foreground">Receipt Vault</p>
-        <p className="mt-1">
-          Store bills and receipts as proof for your business spending. Link each
-          one to a transaction when you are ready — this keeps your records calm
-          and complete.
-        </p>
-      </div>
+      <ReceiptCaptureHub
+        taxYears={taxYears}
+        defaultTaxYearId={defaultTaxYearId}
+      />
 
       {loadError ? (
         <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
@@ -54,15 +59,25 @@ export function ReceiptsVaultView({
       ) : null}
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <ReceiptUploadForm
-          taxYears={taxYears}
-          defaultTaxYearId={defaultTaxYearId}
-          onSuccess={() => router.refresh()}
-        />
+        <details className="rounded-xl border border-border bg-card p-4">
+          <summary className="cursor-pointer text-sm font-medium text-foreground">
+            Add details manually (optional)
+          </summary>
+          <div className="mt-4">
+            <ReceiptUploadForm
+              taxYears={taxYears}
+              defaultTaxYearId={defaultTaxYearId}
+              compact
+              onSuccess={(receiptId) =>
+                router.push(`/receipts/review/${receiptId}`)
+              }
+            />
+          </div>
+        </details>
 
         <ReceiptUnmatchedSection
           receipts={unmatched}
-          onSelect={setSelected}
+          onSelect={handleReceiptSelect}
         />
       </div>
 
@@ -84,7 +99,7 @@ export function ReceiptsVaultView({
               <ReceiptListItem
                 key={receipt.id}
                 receipt={receipt}
-                onSelect={setSelected}
+                onSelect={handleReceiptSelect}
               />
             ))
           )}

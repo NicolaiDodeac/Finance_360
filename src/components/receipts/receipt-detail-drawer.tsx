@@ -228,6 +228,20 @@ export function ReceiptDetailDrawer({
                       disabled={isPending}
                     />
                   </MetadataField>
+                  <MetadataField label="Payment method" id="edit-payment">
+                    <Select
+                      id="edit-payment"
+                      name="payment_method"
+                      defaultValue={receipt.payment_method ?? ""}
+                      disabled={isPending}
+                    >
+                      <option value="">Not sure</option>
+                      <option value="cash">Cash</option>
+                      <option value="card">Card</option>
+                      <option value="contactless">Contactless</option>
+                      <option value="unknown">Unknown</option>
+                    </Select>
+                  </MetadataField>
                   <MetadataField label="VAT amount" id="edit-vat">
                     <Input
                       id="edit-vat"

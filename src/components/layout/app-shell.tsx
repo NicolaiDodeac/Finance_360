@@ -1,5 +1,6 @@
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { AppHeader } from "@/components/layout/app-header";
+import { AppLanguageProvider } from "@/components/providers/app-language-provider";
 import type { FinanceMode } from "@/lib/profile/types";
 import type { UserSpace } from "@/lib/spaces/types";
 
@@ -19,6 +20,7 @@ export function AppShell({
   activeSpaceId,
 }: AppShellProps) {
   return (
+    <AppLanguageProvider>
     <div className="flex min-h-screen bg-background">
       <AppSidebar financeMode={financeMode} />
       <div className="flex flex-1 flex-col">
@@ -33,5 +35,6 @@ export function AppShell({
         </main>
       </div>
     </div>
+    </AppLanguageProvider>
   );
 }

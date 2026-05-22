@@ -3,6 +3,7 @@ import type {
   ReceiptRow,
   ReceiptAttachedTransaction,
 } from "@/lib/receipts/types";
+import type { ReceiptPaymentMethod } from "@/types/database";
 
 const AMOUNT_EXACT_POINTS = 50;
 const AMOUNT_CLOSE_POINTS = 25;
@@ -11,6 +12,7 @@ const MERCHANT_PARTIAL_POINTS = 15;
 const DATE_SAME_POINTS = 20;
 const DATE_CLOSE_POINTS = 10;
 const DATE_NEAR_POINTS = 5;
+const PAYMENT_MATCH_POINTS = 15;
 
 function normalizeText(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
@@ -23,10 +25,31 @@ function daysBetween(a: string, b: string): number {
   return Math.round(Math.abs(dateA - dateB) / msPerDay);
 }
 
+function paymentMethodMatchesAccount(
+  paymentMethod: ReceiptPaymentMethod | null | undefined,
+  accountType: string | null | undefined
+): boolean {
+  if (!paymentMethod || !accountType) return false;
+
+  if (paymentMethod === "cash") {
+    return accountType === "cash";
+  }
+
+  if (paymentMethod === "card" || paymentMethod === "contactless") {
+    return (
+      accountType === "credit_card" ||
+      accountType === "current" ||
+      accountType === "other"
+    );
+  }
+
+  return false;
+}
+
 export function scoreTransactionForReceipt(
   receipt: Pick<
     ReceiptRow,
-    "merchant_name" | "receipt_date" | "total_amount"
+    "merchant_name" | "receipt_date" | "total_amount" | "payment_method"
   >,
   transaction: ReceiptAttachedTransaction
 ): { score: number; reasons: string[] } {
@@ -80,13 +103,24 @@ export function scoreTransactionForReceipt(
     }
   }
 
+  if (
+    receipt.payment_method &&
+    paymentMethodMatchesAccount(
+      receipt.payment_method,
+      transaction.account?.account_type
+    )
+  ) {
+    score += PAYMENT_MATCH_POINTS;
+    reasons.push("Payment method matches account");
+  }
+
   return { score, reasons };
 }
 
 export function rankTransactionMatches(
   receipt: Pick<
     ReceiptRow,
-    "merchant_name" | "receipt_date" | "total_amount"
+    "merchant_name" | "receipt_date" | "total_amount" | "payment_method"
   >,
   transactions: ReceiptAttachedTransaction[],
   options?: { minScore?: number; limit?: number }

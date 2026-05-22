@@ -1,4 +1,9 @@
 export {
+  captureReceipt,
+  createTransactionFromReceipt,
+  getReceiptCaptureReview,
+} from "@/lib/receipts/capture-actions";
+export {
   attachReceiptToTransaction,
   deleteReceipt,
   detachReceiptFromTransaction,

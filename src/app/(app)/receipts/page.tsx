@@ -39,8 +39,8 @@ export default function ReceiptsPage() {
   return (
     <>
       <PageHeader
-        title="Receipt Vault"
-        description="Store proof for business spending and link it to your transactions."
+        title="Receipts"
+        description="Capture receipts, match them to transactions, or create cash and manual entries — you confirm every link."
       />
       <Suspense fallback={<ReceiptsLoading />}>
         <ReceiptsContent />

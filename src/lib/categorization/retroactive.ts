@@ -55,7 +55,19 @@ export function transactionMatchesAnchor(
   if (!keyword) {
     return false;
   }
-  return ruleMatchesTransaction(buildSyntheticRule(keyword), candidate);
+  return transactionMatchesKeyword(keyword, candidate);
+}
+
+/** Match using the same keyword stored on categorization rules. */
+export function transactionMatchesKeyword(
+  keyword: string,
+  candidate: RuleMatchableTransaction
+): boolean {
+  const trimmed = keyword.trim();
+  if (!trimmed) {
+    return false;
+  }
+  return ruleMatchesTransaction(buildSyntheticRule(trimmed), candidate);
 }
 
 export function categorizationChanged(

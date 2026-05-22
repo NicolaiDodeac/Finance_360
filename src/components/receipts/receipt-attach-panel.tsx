@@ -85,8 +85,7 @@ export function ReceiptAttachPanel({
           Link to a transaction
         </h4>
         <p className="text-xs text-muted-foreground">
-          Likely matches are shown first — business expenses without proof
-          attached.
+          Likely matches are shown first by amount, date, and merchant.
         </p>
       </div>
 
@@ -117,8 +116,8 @@ export function ReceiptAttachPanel({
         <p className="text-sm text-muted-foreground">Finding likely matches…</p>
       ) : filtered.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No matching business expenses found. Add or mark transactions as
-          business first.
+          No matching transactions found. Try a different search or create a
+          new transaction from the receipt.
         </p>
       ) : (
         <ul className="max-h-64 space-y-2 overflow-y-auto">

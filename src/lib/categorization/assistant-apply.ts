@@ -1,3 +1,5 @@
+import { buildAssistantPatchFromResolved } from "@/lib/categorization/categorise-flow/assistant-patch";
+import type { CategorisePurpose } from "@/lib/categorization/categorise-flow/types";
 import { ensureCategoryAssignment } from "@/lib/categorization/ensure-category-assignment";
 import { mergeAssistantMetadata } from "@/lib/categorization/assistant-metadata";
 import {
@@ -6,6 +8,11 @@ import {
 } from "@/lib/categorization/apply";
 import { transactionMatchesGroupKey } from "@/lib/categorization/groups";
 import { incrementRulesTimesMatched } from "@/lib/categorization/increment";
+import {
+  filterRetroactiveTargets,
+  transactionMatchesKeyword,
+} from "@/lib/categorization/retroactive";
+import { hmrcCodeForCategoryChoice } from "@/lib/categorization/hmrc-resolution";
 import type {
   ApplyGroupResult,
   AssistantTransactionRow,
@@ -168,6 +175,7 @@ export async function applyGroupCategorisation(
     category_choice: input.category_choice,
     income_type: input.income_type,
     rule_scope: input.rule_scope,
+    flow_type: input.flow_type,
     counts_as_turnover: input.counts_as_turnover,
     exclude_from_income: input.exclude_from_income,
     exclude_from_spending: input.exclude_from_spending,
@@ -194,6 +202,72 @@ export async function applyGroupCategorisation(
     return { updatedCount: targets.length, ruleId: null };
   }
 
+  const hmrcCategoryCode = hmrcCodeForCategoryChoice(input.category_choice);
+
+  const assignmentPatch = buildAssistantPatchFromResolved(
+    {
+      categoryId: input.category_id,
+      categoryName: null,
+      hmrcCategoryId: input.hmrc_category_id,
+      hmrcCategoryName: null,
+      hmrcCategoryCode,
+      isBusiness: input.is_business,
+      businessUsePercent: businessUsePercentForUpdate(input),
+      markReviewRecommended: false,
+      evidenceRecommendation: input.evidence_recommendation ?? null,
+      requiresBusinessUsePercent: false,
+      skipCategoryAssignment: false,
+      choiceLabel: input.category_choice ?? input.income_type ?? "",
+      purpose: (input.purpose ?? "personal") as CategorisePurpose,
+      flowType: input.flow_type,
+      countsAsTurnover: input.counts_as_turnover,
+      excludeFromIncome: input.exclude_from_income,
+      excludeFromSpending: input.exclude_from_spending,
+      incomeTypeId: input.income_type as never,
+    },
+    input.category_choice ?? input.income_type,
+    input.rule_scope
+  );
+
+  const allTargetIds = new Set(targetIds);
+  let retroTargets: AssistantTransactionRow[] = [];
+
+  if (input.create_rule && matchKeyword.trim()) {
+    const anchorTx = targets[0];
+    const anchor = {
+      description: anchorTx.description,
+      merchant_name: anchorTx.merchant_name,
+      direction: anchorTx.direction,
+    };
+    const after = {
+      category_id: input.category_id,
+      hmrc_category_id: input.hmrc_category_id,
+      is_business: input.is_business,
+    };
+    const before = {
+      category_id: null,
+      hmrc_category_id: null,
+      is_business: false,
+    };
+    const keyword = matchKeyword.trim();
+    retroTargets = filterRetroactiveTargets(
+      allUncategorised,
+      anchorTx.id,
+      anchor,
+      before,
+      after
+    ).filter(
+      (tx): tx is AssistantTransactionRow =>
+        !allTargetIds.has(tx.id) &&
+        transactionMatchesKeyword(keyword, tx)
+    );
+    for (const tx of retroTargets) {
+      allTargetIds.add(tx.id);
+    }
+  }
+
+  const updateIds = [...allTargetIds];
+
   const { error } = await supabase
     .from("transactions")
     .update({
@@ -202,26 +276,20 @@ export async function applyGroupCategorisation(
       is_business: input.is_business,
       business_use_percent: businessUsePercentForUpdate(input),
     })
-    .in("id", targetIds)
+    .in("id", updateIds)
     .eq("user_id", userId);
 
   if (error) {
     throw new Error(error.message);
   }
 
-  for (const target of targets) {
+  const rowsToPatch = [...targets, ...retroTargets];
+
+  for (const target of rowsToPatch) {
     let raw = target.raw_import_data;
     raw = mergeAssistantMetadata(raw, {
+      ...assignmentPatch,
       review_recommended: false,
-      evidence_recommendation: input.evidence_recommendation ?? undefined,
-      purpose: input.purpose,
-      flow_type: input.flow_type,
-      category_choice: input.category_choice,
-      income_type: input.income_type,
-      rule_scope: input.rule_scope,
-      counts_as_turnover: input.counts_as_turnover ?? false,
-      exclude_from_income: input.exclude_from_income ?? false,
-      exclude_from_spending: input.exclude_from_spending ?? false,
     });
 
     if (rule) {
@@ -249,5 +317,5 @@ export async function applyGroupCategorisation(
     );
   }
 
-  return { updatedCount: targets.length, ruleId: rule?.id ?? null };
+  return { updatedCount: rowsToPatch.length, ruleId: rule?.id ?? null };
 }

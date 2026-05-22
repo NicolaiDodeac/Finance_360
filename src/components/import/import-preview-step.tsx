@@ -10,11 +10,13 @@ import {
 import { ImportPreviewGroupsSummary } from "@/components/import/import-preview-groups-summary";
 import type { ImportPreviewMerchantGroup } from "@/lib/import/preview-groups";
 import type { ImportPreviewRow } from "@/lib/import/types";
+import type { HmrcCategoryRow } from "@/lib/hmrc/queries";
 
 interface ImportPreviewStepProps {
   rows: ImportPreviewRow[];
   previewGroups: ImportPreviewMerchantGroup[];
   uncategorisedNewCount: number;
+  hmrcCategories?: HmrcCategoryRow[];
   adapterLabel: string;
   fileName: string;
   warnings: string[];
@@ -41,6 +43,7 @@ export function ImportPreviewStep({
   rows,
   previewGroups,
   uncategorisedNewCount,
+  hmrcCategories = [],
   adapterLabel,
   fileName,
   warnings,
@@ -68,6 +71,7 @@ export function ImportPreviewStep({
         <ImportPreviewGroupsSummary
           groups={previewGroups}
           uncategorisedNewCount={uncategorisedNewCount}
+          hmrcCategories={hmrcCategories}
         />
       )}
 

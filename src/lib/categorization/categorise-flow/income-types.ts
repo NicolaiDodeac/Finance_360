@@ -28,6 +28,7 @@ export interface IncomeTypeSpec {
   markReviewRecommended?: boolean;
   evidenceRecommendation: string | null;
   impliedPurpose: CategorisePurpose;
+  keywords?: string[];
 }
 
 export const INCOME_TYPE_SPECS: Record<IncomeTypeChoiceId, IncomeTypeSpec> = {
@@ -40,6 +41,7 @@ export const INCOME_TYPE_SPECS: Record<IncomeTypeChoiceId, IncomeTypeSpec> = {
     excludeFromSpending: false,
     evidenceRecommendation: null,
     impliedPurpose: "personal",
+    keywords: ["salary", "wage", "payroll", "employment", "payslip"],
   },
   self_employed_income: {
     label: "Self-employed / business income",
@@ -51,6 +53,7 @@ export const INCOME_TYPE_SPECS: Record<IncomeTypeChoiceId, IncomeTypeSpec> = {
     evidenceRecommendation:
       "Keep invoices or payment records — this counts as trading turnover.",
     impliedPurpose: "business",
+    keywords: ["self employed", "business", "freelance", "turnover", "invoice"],
   },
   account_transfer: {
     label: "Transfer between my accounts",
@@ -61,6 +64,7 @@ export const INCOME_TYPE_SPECS: Record<IncomeTypeChoiceId, IncomeTypeSpec> = {
     excludeFromSpending: true,
     evidenceRecommendation: null,
     impliedPurpose: "personal",
+    keywords: ["transfer", "own account", "between accounts"],
   },
   refund_income: {
     label: "Refund",
@@ -71,6 +75,7 @@ export const INCOME_TYPE_SPECS: Record<IncomeTypeChoiceId, IncomeTypeSpec> = {
     excludeFromSpending: false,
     evidenceRecommendation: null,
     impliedPurpose: "personal",
+    keywords: ["refund", "return", "reimbursement"],
   },
   investment_income: {
     label: "Investment income",
@@ -81,6 +86,7 @@ export const INCOME_TYPE_SPECS: Record<IncomeTypeChoiceId, IncomeTypeSpec> = {
     excludeFromSpending: false,
     evidenceRecommendation: null,
     impliedPurpose: "personal",
+    keywords: ["investment", "dividend", "interest", "stocks", "shares"],
   },
   gift_income: {
     label: "Gift",
@@ -91,6 +97,7 @@ export const INCOME_TYPE_SPECS: Record<IncomeTypeChoiceId, IncomeTypeSpec> = {
     excludeFromSpending: false,
     evidenceRecommendation: null,
     impliedPurpose: "personal",
+    keywords: ["gift", "present"],
   },
   benefit_payment: {
     label: "Benefit payment",
@@ -101,6 +108,7 @@ export const INCOME_TYPE_SPECS: Record<IncomeTypeChoiceId, IncomeTypeSpec> = {
     excludeFromSpending: false,
     evidenceRecommendation: null,
     impliedPurpose: "personal",
+    keywords: ["benefit", "universal credit", "dwp", "tax credit"],
   },
   other_income: {
     label: "Other income",
@@ -111,6 +119,7 @@ export const INCOME_TYPE_SPECS: Record<IncomeTypeChoiceId, IncomeTypeSpec> = {
     excludeFromSpending: false,
     evidenceRecommendation: null,
     impliedPurpose: "personal",
+    keywords: ["other", "misc", "income"],
   },
   income_not_sure: {
     label: "Not sure",
@@ -122,6 +131,7 @@ export const INCOME_TYPE_SPECS: Record<IncomeTypeChoiceId, IncomeTypeSpec> = {
     markReviewRecommended: true,
     evidenceRecommendation: null,
     impliedPurpose: "not_sure",
+    keywords: ["not sure", "unsure", "review"],
   },
 };
 
@@ -143,10 +153,14 @@ export const INCOME_FLOW_COPY = {
 } as const;
 
 export function getIncomeTypeChoices(): PlainChoice[] {
-  return INCOME_TYPE_ORDER.map((id) => ({
-    id,
-    label: INCOME_TYPE_SPECS[id].label,
-  }));
+  return INCOME_TYPE_ORDER.map((id) => {
+    const spec = INCOME_TYPE_SPECS[id];
+    return {
+      id,
+      label: spec.label,
+      keywords: spec.keywords,
+    };
+  });
 }
 
 export function isIncomeTypeChoiceId(id: string): id is IncomeTypeChoiceId {

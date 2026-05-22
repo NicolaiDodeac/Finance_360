@@ -130,7 +130,8 @@ export function buildReviewSummary(
     return buildIncomeReviewSummary(choiceId as IncomeTypeChoiceId);
   }
 
-  const hmrcId = hmrcOverrideId ?? resolved.hmrcCategoryId;
+  const hmrcId =
+    hmrcOverrideId !== undefined ? hmrcOverrideId : resolved.hmrcCategoryId;
   const hmrcRow = hmrcCategories.find((h) => h.id === hmrcId);
   const hmrcCode = hmrcRow?.code ?? null;
   const hmrcName = taxLabelForHmrc(hmrcCode, hmrcRow?.name ?? resolved.hmrcCategoryName);

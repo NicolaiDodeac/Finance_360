@@ -34,20 +34,21 @@ export function applyCategorizationRules(
     };
   }
 
+  const isBusiness =
+    matched.is_business !== null
+      ? matched.is_business
+      : (existing.is_business ?? false);
+
   const categoryId =
     onlyFillEmpty && existing.category_id
       ? existing.category_id
       : matched.category_id;
 
+  const hmrcFromRule = isBusiness ? matched.hmrc_category_id : null;
   const hmrcCategoryId =
     onlyFillEmpty && existing.hmrc_category_id
       ? existing.hmrc_category_id
-      : matched.hmrc_category_id;
-
-  const isBusiness =
-    matched.is_business !== null
-      ? matched.is_business
-      : (existing.is_business ?? null);
+      : hmrcFromRule;
 
   return {
     category_id: categoryId,
