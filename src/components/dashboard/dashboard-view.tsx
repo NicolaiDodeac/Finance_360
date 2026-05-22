@@ -8,6 +8,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { DashboardBudgetCard } from "@/components/dashboard/dashboard-budget-card";
+import { DashboardCategorySpendRow } from "@/components/dashboard/dashboard-category-spend-row";
 import { DashboardMoneyFlowCard } from "@/components/dashboard/dashboard-money-flow-card";
 import { DashboardPlanningPreview } from "@/components/dashboard/dashboard-planning-preview";
 import {
@@ -113,15 +114,16 @@ export function DashboardView({ data, taxYearId }: DashboardViewProps) {
 
   const topCategoryDisplay = personal.topSpendingCategory
     ? `${personal.topSpendingCategory.categoryName} · ${formatMoney(
-        personal.topSpendingCategory.totalAmount,
+        personal.topSpendingCategory.actualAmount,
         currency
       )}`
     : "—";
 
-  const maxCategorySpend = Math.max(
-    ...personal.spendingByCategory.map((c) => c.totalAmount),
+  const maxCategoryActual = Math.max(
+    ...personal.spendingByCategory.map((c) => c.actualAmount),
     1
   );
+  const hasBudgetPlan = data.budget.hasBudget;
 
   const maxMonthlyNet = Math.max(
     ...personal.monthlyCashflow.map((m) => Math.abs(m.net)),
@@ -189,35 +191,26 @@ export function DashboardView({ data, taxYearId }: DashboardViewProps) {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Spending by category</CardTitle>
-            <CardDescription>Lifestyle spending in {month.label}</CardDescription>
+            <CardDescription>
+              {hasBudgetPlan
+                ? `Actual vs planned · ${month.label}`
+                : `Lifestyle spending · ${month.label}`}
+            </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-1">
             {personal.spendingByCategory.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 No lifestyle spending recorded for {month.label} yet.
               </p>
             ) : (
               personal.spendingByCategory.slice(0, 6).map((row) => (
-                <Link
+                <DashboardCategorySpendRow
                   key={row.categoryId ?? row.categoryName}
+                  row={row}
+                  currency={currency}
                   href={buildPersonalSpendingCategoryLink(row.categoryId, monthRef)}
-                  className="block space-y-1 rounded-lg px-2 py-1.5 -mx-2 transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-                >
-                  <div className="flex justify-between text-sm">
-                    <span>{row.categoryName}</span>
-                    <span className="tabular-nums text-muted-foreground">
-                      {formatMoney(row.totalAmount, currency)}
-                    </span>
-                  </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className="h-full rounded-full bg-primary/70"
-                      style={{
-                        width: `${(row.totalAmount / maxCategorySpend) * 100}%`,
-                      }}
-                    />
-                  </div>
-                </Link>
+                  maxActualScale={maxCategoryActual}
+                />
               ))
             )}
           </CardContent>

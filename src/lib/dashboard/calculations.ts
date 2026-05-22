@@ -33,7 +33,7 @@ import type {
 } from "@/lib/dashboard/types";
 import type { SavingsGoalRow } from "@/lib/goals/types";
 import type { PlanningPlan } from "@/lib/planning/types";
-import type { DashboardBudgetSnapshot } from "@/lib/budget/types";
+import type { BudgetItemWithActual, DashboardBudgetSnapshot } from "@/lib/budget/types";
 import type { DashboardSpaceContext } from "@/lib/dashboard/types";
 import {
   detectRecurringPayments,
@@ -83,17 +83,60 @@ function buildCategorySpending(
     const amount = Number(tx.amount);
 
     if (existing) {
-      existing.totalAmount += amount;
+      existing.actualAmount += amount;
     } else {
       map.set(key, {
         categoryId: tx.category_id,
         categoryName,
-        totalAmount: amount,
+        actualAmount: amount,
+        plannedAmount: null,
       });
     }
   }
 
-  return Array.from(map.values()).sort((a, b) => b.totalAmount - a.totalAmount);
+  return Array.from(map.values()).sort((a, b) => b.actualAmount - a.actualAmount);
+}
+
+/** Merges lifestyle actuals with monthly plan targets for the dashboard. */
+export function mergeCategorySpendingWithPlan(
+  actualRows: DashboardCategorySpend[],
+  budgetItems: BudgetItemWithActual[]
+): DashboardCategorySpend[] {
+  const plannedByCategoryId = new Map(
+    budgetItems.map((item) => [
+      item.categoryId,
+      { categoryName: item.categoryName, plannedAmount: item.targetAmount },
+    ])
+  );
+
+  const merged = new Map<string, DashboardCategorySpend>();
+
+  for (const row of actualRows) {
+    const key = row.categoryId ?? "__uncategorized__";
+    const planned = row.categoryId
+      ? (plannedByCategoryId.get(row.categoryId)?.plannedAmount ?? null)
+      : null;
+    merged.set(key, {
+      ...row,
+      plannedAmount: planned,
+    });
+    if (row.categoryId) plannedByCategoryId.delete(row.categoryId);
+  }
+
+  for (const [categoryId, planned] of plannedByCategoryId) {
+    merged.set(categoryId, {
+      categoryId,
+      categoryName: planned.categoryName,
+      actualAmount: 0,
+      plannedAmount: planned.plannedAmount,
+    });
+  }
+
+  return Array.from(merged.values()).sort((a, b) => {
+    const aScore = Math.max(a.actualAmount, a.plannedAmount ?? 0);
+    const bScore = Math.max(b.actualAmount, b.plannedAmount ?? 0);
+    return bScore - aScore;
+  });
 }
 
 function buildMonthlyCashflow(
@@ -360,15 +403,25 @@ export function buildDashboardData(input: {
   planningPlans: PlanningPlan[];
   spaceContext: DashboardSpaceContext;
   budgetSnapshot: DashboardBudgetSnapshot;
+  budgetItems: BudgetItemWithActual[];
   month: DashboardMonthContext;
 }): DashboardData {
   const { month } = input;
   const monthRef = monthReferenceDate(month.year, month.month);
-  const personal = buildPersonalMetrics(
+  const personalBase = buildPersonalMetrics(
     input.transactions,
     month,
     input.financeMode
   );
+  const spendingByCategory = mergeCategorySpendingWithPlan(
+    personalBase.spendingByCategory,
+    input.budgetItems
+  );
+  const personal = {
+    ...personalBase,
+    spendingByCategory,
+    topSpendingCategory: spendingByCategory[0] ?? null,
+  };
   const recurringAll = detectRecurringPayments(input.transactions);
   const recurring = filterRecurringForMonth(
     recurringAll,

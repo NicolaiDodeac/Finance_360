@@ -1,6 +1,10 @@
+import type { ReceiptPurpose } from "@/lib/receipts/classify";
+import type { ReceiptCreationSuggestion } from "@/lib/receipts/suggest";
 import type { ReceiptOcrExtraction } from "@/lib/receipts/ocr/types";
 import type { TaxYearRow } from "@/lib/tax-years/queries";
-import type { Database, ReceiptPaymentMethod } from "@/types/database";
+import type { Database, FinanceMode, ReceiptPaymentMethod } from "@/types/database";
+
+export type { ReceiptPurpose };
 
 export type ReceiptRow = Database["public"]["Tables"]["receipts"]["Row"];
 export type { ReceiptPaymentMethod };
@@ -28,12 +32,13 @@ export type ReceiptTransactionKind =
   | "business_income";
 
 export interface CreateTransactionFromReceiptInput {
-  kind: ReceiptTransactionKind;
-  category_id?: string | null;
-  hmrc_category_id?: string | null;
-  is_business?: boolean;
-  business_use_percent?: number | null;
-  notes?: string;
+  purpose: ReceiptPurpose;
+  payment_method?: ReceiptPaymentMethod | null;
+  /** Skip creation (user chose "Skip for now"). */
+  skip?: boolean;
+  /** Record as income — only when user explicitly chooses. */
+  record_as_income?: boolean;
+  income_kind?: "cash_income" | "business_income";
 }
 
 export interface ReceiptCaptureReviewData {
@@ -41,6 +46,10 @@ export interface ReceiptCaptureReviewData {
   extraction: ReceiptOcrExtraction;
   suggestedMatch: ReceiptMatchCandidate | null;
   candidates: ReceiptMatchCandidate[];
+  financeMode: FinanceMode;
+  creationSuggestion: ReceiptCreationSuggestion;
+  showPaymentPrompt: boolean;
+  classificationLooksBusiness: boolean;
 }
 
 export interface ReceiptWithRelations extends ReceiptRow {
