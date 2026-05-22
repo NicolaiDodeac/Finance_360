@@ -6,15 +6,17 @@ import { Button } from "@/components/ui/button";
 import { requireAuth } from "@/lib/auth/helpers";
 import { getCategories } from "@/lib/categories/queries";
 import { getCategorizationRules } from "@/lib/categorization/queries";
+import { dryRunRuleRepairForUser } from "@/lib/categorization/rule-repair";
 import { getHmrcCategories } from "@/lib/hmrc/queries";
 
 export default async function CategorizationRulesPage() {
   const user = await requireAuth();
 
-  const [rules, categories, hmrcCategories] = await Promise.all([
+  const [rules, categories, hmrcCategories, repairPreview] = await Promise.all([
     getCategorizationRules(user.id),
     getCategories(user.id),
     getHmrcCategories(),
+    dryRunRuleRepairForUser(user.id),
   ]);
 
   return (
@@ -35,6 +37,7 @@ export default async function CategorizationRulesPage() {
         rules={rules}
         categories={categories}
         hmrcCategories={hmrcCategories}
+        repairableRuleCount={repairPreview.repairableCount}
       />
     </>
   );

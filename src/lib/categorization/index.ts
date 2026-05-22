@@ -32,6 +32,12 @@ export {
 export { applyRetroactiveCategorization } from "@/lib/categorization/retroactive-apply";
 
 export { getCategorizationRules, getCategorizationRuleById } from "@/lib/categorization/queries";
+export {
+  dryRunRuleRepair,
+  dryRunRuleRepairForUser,
+  executeRuleRepair,
+  gatherRuleAssistantHints,
+} from "@/lib/categorization/rule-repair";
 
 export {
   createCategorizationRule,

@@ -13,6 +13,7 @@ import {
 import { incrementRulesTimesMatched } from "@/lib/categorization/increment";
 import { getCategorizationRules } from "@/lib/categorization/queries";
 import { getCategories } from "@/lib/categories/queries";
+import { getHmrcCategories } from "@/lib/hmrc/queries";
 import { buildImportPreviewGroups } from "@/lib/import/preview-groups";
 import type { ImportPreviewMerchantGroup } from "@/lib/import/preview-groups";
 import { parseImportFile } from "@/lib/import/parse";
@@ -32,6 +33,7 @@ export interface ParseImportPreviewResult extends ParseImportFileResult {
   preview_groups: ImportPreviewMerchantGroup[];
   uncategorised_new_count: number;
   account_id: string;
+  hmrc_categories: Awaited<ReturnType<typeof getHmrcCategories>>;
 }
 
 export async function parseImportPreview(
@@ -56,9 +58,10 @@ export async function parseImportPreview(
   try {
     const buffer = Buffer.from(await file.arrayBuffer());
     const parsed = await parseImportFile(file.name, buffer, file.type);
-    const [rules, categories] = await Promise.all([
+    const [rules, categories, hmrcCategories] = await Promise.all([
       getCategorizationRules(user.id, { activeOnly: true }),
       getCategories(user.id),
+      getHmrcCategories(),
     ]);
 
     const categorizedTransactions = parsed.transactions.map((tx) => {
@@ -69,7 +72,7 @@ export async function parseImportPreview(
         },
         rules,
         tx.raw_import_data,
-        { direction: tx.direction, categories }
+        { direction: tx.direction, categories, hmrcCategories }
       );
 
       return {
@@ -126,6 +129,7 @@ export async function parseImportPreview(
         preview_groups,
         uncategorised_new_count,
         account_id: accountId,
+        hmrc_categories: hmrcCategories,
       },
     };
   } catch (err) {

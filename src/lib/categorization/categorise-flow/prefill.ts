@@ -42,7 +42,8 @@ const SLUG_TO_CHOICE: Partial<Record<string, CategoryChoiceId>> = {
   "other-expense": "other_personal_expense",
 };
 
-const BUSINESS_EXPENSE_SLUG: Partial<Record<string, CategoryChoiceId>> = {
+/** Maps financial category slug → business expense flow choice (when purpose is business). */
+export const BUSINESS_EXPENSE_SLUG: Partial<Record<string, CategoryChoiceId>> = {
   subscriptions: "software_digital",
   "phone-internet": "biz_phone_internet",
   fuel: "fuel_travel",
@@ -52,6 +53,13 @@ const BUSINESS_EXPENSE_SLUG: Partial<Record<string, CategoryChoiceId>> = {
   "car-maintenance": "repairs_maintenance",
   "other-expense": "other_business_expense",
 };
+
+export function businessExpenseChoiceFromCategorySlug(
+  slug: string | undefined | null
+): CategoryChoiceId | null {
+  if (!slug) return null;
+  return BUSINESS_EXPENSE_SLUG[slug] ?? null;
+}
 
 function slugToChoice(
   slug: string | undefined,

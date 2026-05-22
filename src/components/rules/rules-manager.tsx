@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/drawer";
 import { RuleFormFields } from "@/components/rules/rule-form-fields";
 import { RulesList } from "@/components/rules/rules-list";
+import { RulesRepairBanner } from "@/components/rules/rules-repair-banner";
 import {
   createCategorizationRule,
   deleteCategorizationRule,
@@ -32,12 +33,14 @@ interface RulesManagerProps {
   rules: CategorizationRuleRow[];
   categories: CategoryRow[];
   hmrcCategories: HmrcCategoryRow[];
+  repairableRuleCount: number;
 }
 
 export function RulesManager({
   rules,
   categories,
   hmrcCategories,
+  repairableRuleCount,
 }: RulesManagerProps) {
   const router = useRouter();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -115,6 +118,8 @@ export function RulesManager({
           {error}
         </p>
       )}
+
+      <RulesRepairBanner repairableCount={repairableRuleCount} />
 
       <RulesList
         rules={rules}

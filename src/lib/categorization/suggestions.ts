@@ -1,4 +1,5 @@
 import type { CategoryRow } from "@/lib/categories/queries";
+import { looksLikeEatingOut } from "@/lib/categorization/eating-out-detect";
 import { normalizeMerchantGroupKey } from "@/lib/categorization/normalize";
 import { looksLikeTaxPayment } from "@/lib/categorization/tax-payment-detect";
 import type { CategorizationRuleRow } from "@/lib/categorization/types";
@@ -93,6 +94,13 @@ const PATTERN_RULES: PatternRule[] = [
     categorySlug: "utilities",
     confidence: "high",
     reason: "Utility provider",
+  },
+  {
+    test: (key, dir) => dir === "expense" && looksLikeEatingOut(key),
+    categorySlug: "eating-out",
+    confidence: "high",
+    reason: "Looks like a restaurant, café, or food delivery",
+    isBusiness: false,
   },
   {
     test: (key) => key.includes("TESCO") && !key.includes("INSURANCE"),

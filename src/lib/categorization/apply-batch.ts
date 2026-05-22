@@ -3,8 +3,10 @@ import {
   buildCategorizationMetadata,
   mergeRawImportCategorization,
 } from "@/lib/categorization/apply";
+import { mergeAssistantMetadata } from "@/lib/categorization/assistant-metadata";
 import { mergeRuleFlowTypeMetadata } from "@/lib/categorization/rule-flow-type";
 import type { CategoryRow } from "@/lib/categories/queries";
+import type { HmrcCategoryRow } from "@/lib/hmrc/queries";
 import type {
   CategorizationRuleRow,
   RuleMatchableTransaction,
@@ -26,6 +28,7 @@ export function applyRulesToImportRow(
   options?: {
     direction?: string;
     categories?: CategoryRow[];
+    hmrcCategories?: HmrcCategoryRow[];
   }
 ): CategorizedTransactionFields {
   const applied = applyCategorizationRules(tx, rules, {
@@ -43,7 +46,7 @@ export function applyRulesToImportRow(
 
   let raw = mergeRawImportCategorization(rawImportData, metadata);
 
-  if (applied.matched_rule && applied.category_id && options?.categories) {
+  if (applied.matched_rule && options?.categories) {
     const category = options.categories.find((c) => c.id === applied.category_id);
     const isBusiness = applied.is_business ?? false;
     raw = mergeRuleFlowTypeMetadata(raw, {
@@ -51,6 +54,17 @@ export function applyRulesToImportRow(
       direction: options.direction ?? "expense",
       isBusiness,
     });
+
+    if (applied.hmrc_category_id && options.hmrcCategories) {
+      const hmrc = options.hmrcCategories.find(
+        (h) => h.id === applied.hmrc_category_id
+      );
+      if (hmrc?.code) {
+        raw = mergeAssistantMetadata(raw, {
+          hmrc_category_code: hmrc.code,
+        });
+      }
+    }
   }
 
   return {

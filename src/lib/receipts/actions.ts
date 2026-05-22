@@ -18,6 +18,7 @@ import {
   isAllowedReceiptFile,
 } from "@/lib/receipts/storage";
 import type { ActionResult, ReceiptFormInput } from "@/lib/receipts/types";
+import type { ReceiptPaymentMethod } from "@/types/database";
 import { createClient } from "@/lib/supabase/server";
 import { getTaxYears } from "@/lib/tax-years/queries";
 
@@ -49,6 +50,14 @@ function parseReceiptMetadata(formData: FormData): {
   const tax_year_id = String(formData.get("tax_year_id") ?? "").trim() || null;
   const total_amount = parseOptionalAmount(formData.get("total_amount"));
   const vat_amount = parseOptionalAmount(formData.get("vat_amount"));
+  const paymentRaw = String(formData.get("payment_method") ?? "").trim();
+  const payment_method: ReceiptPaymentMethod | null =
+    paymentRaw === "cash" ||
+    paymentRaw === "card" ||
+    paymentRaw === "contactless" ||
+    paymentRaw === "unknown"
+      ? paymentRaw
+      : null;
 
   if (total_amount === null && formData.get("total_amount")) {
     return {
@@ -57,6 +66,7 @@ function parseReceiptMetadata(formData: FormData): {
         receipt_date,
         total_amount: null,
         vat_amount: null,
+        payment_method,
         notes,
         tax_year_id,
       },
@@ -72,6 +82,7 @@ function parseReceiptMetadata(formData: FormData): {
         receipt_date,
         total_amount,
         vat_amount: null,
+        payment_method,
         notes,
         tax_year_id,
       },
@@ -86,6 +97,7 @@ function parseReceiptMetadata(formData: FormData): {
       receipt_date,
       total_amount,
       vat_amount,
+      payment_method,
       notes,
       tax_year_id,
     },
@@ -163,6 +175,7 @@ export async function uploadReceipt(
       receipt_date: metadata.receipt_date || null,
       total_amount: metadata.total_amount,
       vat_amount: metadata.vat_amount,
+      payment_method: metadata.payment_method,
       notes: metadata.notes || null,
       tax_year_id: taxYearId,
     })
@@ -197,6 +210,7 @@ export async function updateReceiptMetadata(
       receipt_date: metadata.receipt_date || null,
       total_amount: metadata.total_amount,
       vat_amount: metadata.vat_amount,
+      payment_method: metadata.payment_method,
       notes: metadata.notes || null,
       tax_year_id: taxYearId,
     })

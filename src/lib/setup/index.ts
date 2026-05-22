@@ -1,4 +1,7 @@
-import { ensureDefaultAccount } from "@/lib/accounts/queries";
+import {
+  ensureCashManualAccount,
+  ensureDefaultAccount,
+} from "@/lib/accounts/queries";
 import { ensurePersonalSpace } from "@/lib/spaces/queries";
 import { createClient } from "@/lib/supabase/server";
 import { ensureDefaultCategories } from "@/lib/setup/categories";
@@ -33,6 +36,7 @@ export async function ensureUserSetup(userId: string): Promise<UserSetupResult> 
   // Sequential setup with one session avoids parallel cookie/client races.
   await ensurePersonalSpace(userId);
   await ensureDefaultAccount(userId, supabase);
+  await ensureCashManualAccount(userId, supabase);
   await ensureDefaultCategories(userId, supabase);
   await ensureDefaultTaxYears(userId, supabase);
 

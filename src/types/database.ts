@@ -18,6 +18,14 @@ export type RuleMatchType =
 
 export type FinanceMode = "personal" | "self_employed" | "both";
 
+export type ReceiptPaymentMethod =
+  | "cash"
+  | "card"
+  | "contactless"
+  | "unknown";
+
+export type ReceiptSource = "manual" | "receipt_capture";
+
 export type SpaceType = "personal" | "household" | "business";
 
 export type SpaceMemberRole = "owner" | "admin" | "member";
@@ -430,6 +438,9 @@ export interface Database {
           vat_amount: number | null;
           tax_year_id: string | null;
           notes: string | null;
+          ocr_data: Record<string, unknown> | null;
+          payment_method: ReceiptPaymentMethod | null;
+          source: ReceiptSource;
           created_at: string;
           updated_at: string;
         };
@@ -446,6 +457,9 @@ export interface Database {
           vat_amount?: number | null;
           tax_year_id?: string | null;
           notes?: string | null;
+          ocr_data?: Record<string, unknown> | null;
+          payment_method?: ReceiptPaymentMethod | null;
+          source?: ReceiptSource;
         };
         Update: {
           storage_path?: string;
@@ -458,6 +472,9 @@ export interface Database {
           vat_amount?: number | null;
           tax_year_id?: string | null;
           notes?: string | null;
+          ocr_data?: Record<string, unknown> | null;
+          payment_method?: ReceiptPaymentMethod | null;
+          source?: ReceiptSource;
         };
       };
       categorization_rules: {

@@ -20,7 +20,7 @@ export function ReceiptUnmatchedSection({
       <CardHeader>
         <CardTitle className="text-base">Unmatched receipts</CardTitle>
         <CardDescription>
-          Proof stored but not yet linked to a business expense — tap to match.
+          Not linked yet — tap to review and match or create a transaction.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-2">

@@ -2,16 +2,19 @@
 
 import { Badge } from "@/components/ui/badge";
 import type { ImportPreviewMerchantGroup } from "@/lib/import/preview-groups";
+import type { HmrcCategoryRow } from "@/lib/hmrc/queries";
 import { formatMoney } from "@/lib/transactions/format";
 
 interface ImportPreviewGroupsSummaryProps {
   groups: ImportPreviewMerchantGroup[];
   uncategorisedNewCount: number;
+  hmrcCategories?: HmrcCategoryRow[];
 }
 
 export function ImportPreviewGroupsSummary({
   groups,
   uncategorisedNewCount,
+  hmrcCategories = [],
 }: ImportPreviewGroupsSummaryProps) {
   if (groups.length === 0 && uncategorisedNewCount === 0) {
     return null;
@@ -45,6 +48,15 @@ export function ImportPreviewGroupsSummary({
               {group.suggestion && (
                 <span className="text-muted-foreground">
                   Suggested: {group.suggestion.categoryName}
+                  {group.suggestion.isBusiness && group.suggestion.hmrcCategoryId && (
+                    <>
+                      {" "}
+                      · Tax:{" "}
+                      {hmrcCategories.find(
+                        (h) => h.id === group.suggestion?.hmrcCategoryId
+                      )?.name ?? "from saved rule"}
+                    </>
+                  )}
                   {group.suggestion.confidence === "high" && (
                     <Badge variant="secondary" className="ml-2 text-xs">
                       High confidence

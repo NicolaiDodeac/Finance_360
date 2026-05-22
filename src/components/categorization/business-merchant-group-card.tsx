@@ -4,12 +4,13 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { ChoiceButtons } from "@/components/categorization/flow/choice-buttons";
+import { SearchableChoiceButtons } from "@/components/categorization/flow/searchable-choice-buttons";
 import { RememberSection } from "@/components/categorization/flow/remember-section";
 import { StepReview } from "@/components/categorization/flow/step-review";
 import { applyMerchantGroupCategorisation } from "@/lib/categorization/assistant-actions";
 import type { MerchantGroup } from "@/lib/categorization/assistant-types";
 import {
+  CHOICE_SPECS,
   FLOW_COPY,
   getCategoryChoices,
   getIncomeTypeChoices,
@@ -95,7 +96,9 @@ export function BusinessMerchantGroupCard({
     initialPrefill?.incomeTypeId ?? null
   );
   const [businessUsePercent, setBusinessUsePercent] = useState(50);
-  const [hmrcOverrideId, setHmrcOverrideId] = useState<string | null>(null);
+  const [hmrcOverrideId, setHmrcOverrideId] = useState<string | null | undefined>(
+    undefined
+  );
   const [rememberEnabled, setRememberEnabled] = useState(!ambiguous);
   const [ruleScope, setRuleScope] = useState<RuleScope>(
     ambiguous ? "group_only" : "future_similar"
@@ -113,7 +116,7 @@ export function BusinessMerchantGroupCard({
     setPrefillReason(initialPrefill?.prefillReason ?? null);
     setRememberEnabled(!ambiguous);
     setRuleScope(ambiguous ? "group_only" : "future_similar");
-    setHmrcOverrideId(null);
+    setHmrcOverrideId(undefined);
     setError(null);
   }, [group.groupKey, initialPrefill, ambiguous]);
 
@@ -159,7 +162,7 @@ export function BusinessMerchantGroupCard({
   function handlePurposeSelect(next: CategorisePurpose) {
     setPurpose(next);
     setChoiceId(null);
-    setHmrcOverrideId(null);
+    setHmrcOverrideId(undefined);
     setPrefillReason(null);
     if (next === "not_sure") {
       setExpenseStep(1);
@@ -171,6 +174,7 @@ export function BusinessMerchantGroupCard({
   function handleCategorySelect(id: string) {
     if (!isCategoryChoiceId(id)) return;
     setChoiceId(id);
+    setHmrcOverrideId(undefined);
     setExpenseStep(3);
   }
 
@@ -253,13 +257,23 @@ export function BusinessMerchantGroupCard({
       return;
     }
 
+    if (!resolved.skipCategoryAssignment && !resolved.categoryId) {
+      setError(
+        "This category is not set up yet. Add categories in Settings or go back."
+      );
+      return;
+    }
+
     if (
       !resolved.skipCategoryAssignment &&
-      !resolved.categoryId &&
+      resolved.isBusiness &&
+      resolved.purpose === "business" &&
+      choiceId &&
+      CHOICE_SPECS[choiceId].hmrcCode &&
       !resolved.hmrcCategoryId
     ) {
       setError(
-        "This category is not set up yet. Add categories in Settings or go back."
+        "Tax category needs review — pick a tax category on the review step before confirming."
       );
       return;
     }
@@ -386,7 +400,7 @@ export function BusinessMerchantGroupCard({
           <div className="space-y-3">
             <p className="text-base font-semibold">{INCOME_FLOW_COPY.question}</p>
             <p className="text-sm text-muted-foreground">{INCOME_FLOW_COPY.hint}</p>
-            <ChoiceButtons
+            <SearchableChoiceButtons
               choices={incomeTypeChoices}
               selectedId={incomeTypeId}
               disabled={disabled || isPending}
@@ -443,7 +457,7 @@ export function BusinessMerchantGroupCard({
             <p className="text-sm text-muted-foreground">
               {FLOW_COPY.categoryHint}
             </p>
-            <ChoiceButtons
+            <SearchableChoiceButtons
               choices={categoryChoices}
               selectedId={choiceId}
               disabled={disabled || isPending}

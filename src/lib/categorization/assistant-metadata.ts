@@ -9,6 +9,8 @@ export interface AssistantTransactionMetadata {
   flow_type?: FlowType;
   /** Expense category choice or income type id. */
   category_choice?: string;
+  /** HMRC category code when a business expense was categorised. */
+  hmrc_category_code?: string;
   income_type?: string;
   rule_scope?: string;
   counts_as_turnover?: boolean;

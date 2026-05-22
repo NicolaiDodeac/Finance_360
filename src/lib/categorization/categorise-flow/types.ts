@@ -61,6 +61,7 @@ export type CategoryChoiceId =
 export interface PlainChoice {
   id: string;
   label: string;
+  keywords?: string[];
 }
 
 export interface ResolvedCategorisation {
@@ -68,6 +69,7 @@ export interface ResolvedCategorisation {
   categoryName: string | null;
   hmrcCategoryId: string | null;
   hmrcCategoryName: string | null;
+  hmrcCategoryCode?: string | null;
   isBusiness: boolean;
   businessUsePercent: number | null;
   markReviewRecommended: boolean;

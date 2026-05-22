@@ -17,8 +17,12 @@ const nextConfig: NextConfig = {
       "./node_modules/pdf-parse/dist/worker/**/*",
       "./node_modules/@napi-rs/canvas/**/*",
     ],
+    "/receipts": [
+      "./node_modules/pdf-parse/dist/worker/**/*",
+      "./node_modules/tesseract.js/dist/**/*",
+    ],
   },
-  serverExternalPackages: ["pdf-parse", "@napi-rs/canvas"],
+  serverExternalPackages: ["pdf-parse", "@napi-rs/canvas", "tesseract.js"],
 };
 
 export default nextConfig;

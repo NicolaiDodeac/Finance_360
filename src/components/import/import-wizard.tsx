@@ -127,6 +127,7 @@ export function ImportWizard({ accounts, defaultAccountId }: ImportWizardProps) 
           rows={parseResult.preview_rows}
           previewGroups={parseResult.preview_groups}
           uncategorisedNewCount={parseResult.uncategorised_new_count}
+          hmrcCategories={parseResult.hmrc_categories}
           adapterLabel={parseResult.adapterLabel}
           fileName={parseResult.fileName}
           warnings={parseResult.warnings}

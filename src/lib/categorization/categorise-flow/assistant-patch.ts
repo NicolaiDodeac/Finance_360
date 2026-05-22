@@ -23,5 +23,9 @@ export function buildAssistantPatchFromResolved(
     base.category_choice = resolved.incomeTypeId;
   }
 
+  if (resolved.hmrcCategoryCode) {
+    base.hmrc_category_code = resolved.hmrcCategoryCode;
+  }
+
   return base;
 }

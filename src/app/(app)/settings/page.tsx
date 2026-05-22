@@ -10,6 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { AppLanguageCard } from "@/components/settings/app-language-card";
 import { FinanceModeCard } from "@/components/settings/finance-mode-card";
 import { requireAuth } from "@/lib/auth/helpers";
 import { ensureProfile } from "@/lib/profile/queries";
@@ -34,6 +35,7 @@ export default async function SettingsPage() {
       />
       <div className="grid gap-4 md:grid-cols-2">
         <FinanceModeCard currentMode={profile.finance_mode} />
+        <AppLanguageCard />
         <SetupStatusCard status={setupStatus} />
         <Card>
           <CardHeader>

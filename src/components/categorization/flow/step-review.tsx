@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { Select } from "@/components/ui/select";
 import {
   buildReviewSummary,
+  CHOICE_SPECS,
+  isCategoryChoiceId,
   isIncomeTypeChoiceId,
   type CategoryChoiceId,
   type IncomeTypeChoiceId,
@@ -19,7 +21,7 @@ interface StepReviewProps {
   hmrcCategories: HmrcCategoryRow[];
   businessUsePercent: number;
   onBusinessUsePercentChange: (value: number) => void;
-  hmrcOverrideId: string | null;
+  hmrcOverrideId?: string | null;
   onHmrcOverrideChange: (id: string | null) => void;
   prefillReason?: string | null;
   disabled?: boolean;
@@ -39,10 +41,23 @@ export function StepReview({
 }: StepReviewProps) {
   const [showHmrcPicker, setShowHmrcPicker] = useState(false);
 
-  const displayHmrcId = hmrcOverrideId ?? resolved.hmrcCategoryId;
+  const showHmrcRow =
+    resolved.isBusiness &&
+    resolved.purpose === "business" &&
+    !resolved.skipCategoryAssignment &&
+    direction === "expense";
+
+  const displayHmrcId =
+    hmrcOverrideId !== undefined ? hmrcOverrideId : resolved.hmrcCategoryId;
   const displayHmrcName =
     hmrcCategories.find((h) => h.id === displayHmrcId)?.name ??
     resolved.hmrcCategoryName;
+
+  const needsTaxReview =
+    showHmrcRow &&
+    isCategoryChoiceId(choiceId) &&
+    Boolean(CHOICE_SPECS[choiceId].hmrcCode) &&
+    !displayHmrcId;
 
   const summary = useMemo(
     () =>
@@ -64,11 +79,6 @@ export function StepReview({
     ]
   );
 
-  const showHmrcRow =
-    resolved.isBusiness &&
-    resolved.purpose === "business" &&
-    !resolved.skipCategoryAssignment;
-
   const isIncomeType = isIncomeTypeChoiceId(choiceId);
 
   return (
@@ -83,6 +93,13 @@ export function StepReview({
       <p className="rounded-lg border border-primary/15 bg-primary/5 px-3 py-3 text-sm leading-relaxed text-foreground">
         {summary}
       </p>
+
+      {needsTaxReview && (
+        <p className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-sm text-amber-950 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
+          Tax category needs review — choose a tax category below before you
+          confirm.
+        </p>
+      )}
 
       {prefillReason && (
         <p className="rounded-lg bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
@@ -143,6 +160,10 @@ export function StepReview({
               <dd className="flex flex-wrap items-center gap-2 text-muted-foreground">
                 {displayHmrcName ? (
                   <span className="text-foreground">{displayHmrcName}</span>
+                ) : needsTaxReview ? (
+                  <span className="text-amber-800 dark:text-amber-200">
+                    Tax category needs review
+                  </span>
                 ) : (
                   <span>Not required</span>
                 )}

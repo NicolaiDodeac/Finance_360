@@ -12,6 +12,7 @@ export interface ChoiceSpec {
   isBusiness: boolean;
   evidenceRecommendation: string | null;
   requiresBusinessUsePercent?: boolean;
+  keywords?: string[];
 }
 
 export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
@@ -21,6 +22,7 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     hmrcCode: null,
     isBusiness: false,
     evidenceRecommendation: null,
+    keywords: ["salary", "wage", "payroll", "employment", "payslip"],
   },
   refund: {
     label: "Refund",
@@ -28,6 +30,7 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     hmrcCode: null,
     isBusiness: false,
     evidenceRecommendation: null,
+    keywords: ["refund", "return", "reimbursement"],
   },
   own_transfer: {
     label: "Transfer from own account",
@@ -35,6 +38,7 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     hmrcCode: null,
     isBusiness: false,
     evidenceRecommendation: null,
+    keywords: ["transfer", "own account", "between accounts"],
   },
   gift: {
     label: "Gift",
@@ -42,6 +46,7 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     hmrcCode: null,
     isBusiness: false,
     evidenceRecommendation: null,
+    keywords: ["gift", "present", "donation received"],
   },
   other_personal_income: {
     label: "Other income",
@@ -49,6 +54,7 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     hmrcCode: null,
     isBusiness: false,
     evidenceRecommendation: null,
+    keywords: ["income", "other", "misc"],
   },
   groceries: {
     label: "Groceries",
@@ -56,6 +62,19 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     hmrcCode: null,
     isBusiness: false,
     evidenceRecommendation: null,
+    keywords: [
+      "food",
+      "grocery",
+      "groceries",
+      "supermarket",
+      "tesco",
+      "asda",
+      "sainsbury",
+      "aldi",
+      "lidl",
+      "morrisons",
+      "shop",
+    ],
   },
   rent_mortgage: {
     label: "Rent / mortgage",
@@ -63,6 +82,7 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     hmrcCode: null,
     isBusiness: false,
     evidenceRecommendation: null,
+    keywords: ["rent", "mortgage", "housing", "landlord", "letting"],
   },
   utilities: {
     label: "Utilities",
@@ -70,6 +90,7 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     hmrcCode: null,
     isBusiness: false,
     evidenceRecommendation: null,
+    keywords: ["utility", "utilities", "gas", "electric", "electricity", "water"],
   },
   phone_internet: {
     label: "Phone / internet",
@@ -77,6 +98,7 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     hmrcCode: null,
     isBusiness: false,
     evidenceRecommendation: null,
+    keywords: ["phone", "mobile", "broadband", "internet", "wifi", "sim"],
   },
   subscriptions: {
     label: "Subscriptions",
@@ -84,6 +106,7 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     hmrcCode: null,
     isBusiness: false,
     evidenceRecommendation: null,
+    keywords: ["subscription", "netflix", "spotify", "streaming", "membership"],
   },
   transport: {
     label: "Transport",
@@ -91,6 +114,7 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     hmrcCode: null,
     isBusiness: false,
     evidenceRecommendation: null,
+    keywords: ["transport", "train", "bus", "tube", "oyster", "travelcard", "taxi"],
   },
   fuel: {
     label: "Fuel",
@@ -98,6 +122,7 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     hmrcCode: null,
     isBusiness: false,
     evidenceRecommendation: null,
+    keywords: ["fuel", "petrol", "diesel", "garage", "filling station"],
   },
   insurance: {
     label: "Insurance",
@@ -105,6 +130,7 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     hmrcCode: null,
     isBusiness: false,
     evidenceRecommendation: null,
+    keywords: ["insurance", "premium", "policy"],
   },
   children_family: {
     label: "Children / family",
@@ -112,6 +138,7 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     hmrcCode: null,
     isBusiness: false,
     evidenceRecommendation: null,
+    keywords: ["child", "children", "family", "school", "nursery", "parentpay"],
   },
   eating_out: {
     label: "Eating out",
@@ -119,6 +146,18 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     hmrcCode: null,
     isBusiness: false,
     evidenceRecommendation: null,
+    keywords: [
+      "restaurant",
+      "cafe",
+      "coffee",
+      "takeaway",
+      "pizza",
+      "pub",
+      "bar",
+      "food out",
+      "dining",
+      "deliveroo",
+    ],
   },
   entertainment: {
     label: "Entertainment",
@@ -126,6 +165,7 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     hmrcCode: null,
     isBusiness: false,
     evidenceRecommendation: null,
+    keywords: ["entertainment", "cinema", "theatre", "concert", "games"],
   },
   clothing: {
     label: "Shopping / clothing",
@@ -133,6 +173,7 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     hmrcCode: null,
     isBusiness: false,
     evidenceRecommendation: null,
+    keywords: ["clothing", "clothes", "shopping", "fashion", "retail"],
   },
   health: {
     label: "Health",
@@ -140,6 +181,7 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     hmrcCode: null,
     isBusiness: false,
     evidenceRecommendation: null,
+    keywords: ["health", "medical", "doctor", "dentist", "pharmacy", "optician"],
   },
   car_maintenance: {
     label: "Car maintenance",
@@ -147,6 +189,7 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     hmrcCode: null,
     isBusiness: false,
     evidenceRecommendation: null,
+    keywords: ["car", "mot", "service", "repair", "garage", "tyres"],
   },
   education: {
     label: "Education",
@@ -154,6 +197,7 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     hmrcCode: null,
     isBusiness: false,
     evidenceRecommendation: null,
+    keywords: ["education", "course", "tuition", "training", "school fees"],
   },
   bank_fees: {
     label: "Bank fees",
@@ -161,6 +205,7 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     hmrcCode: null,
     isBusiness: false,
     evidenceRecommendation: null,
+    keywords: ["bank fee", "overdraft", "charge", "interest charge"],
   },
   savings_contribution: {
     label: "Savings contribution",
@@ -168,6 +213,15 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     hmrcCode: null,
     isBusiness: false,
     evidenceRecommendation: null,
+    keywords: [
+      "save",
+      "savings",
+      "help to save",
+      "isa",
+      "lisa",
+      "moneybox",
+      "deposit",
+    ],
   },
   investment_contribution: {
     label: "Investment contribution",
@@ -175,6 +229,7 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     hmrcCode: null,
     isBusiness: false,
     evidenceRecommendation: null,
+    keywords: ["invest", "investment", "stocks", "shares", "pension pot"],
   },
   debt_repayment: {
     label: "Debt repayment",
@@ -182,6 +237,7 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     hmrcCode: null,
     isBusiness: false,
     evidenceRecommendation: null,
+    keywords: ["loan", "credit card", "klarna", "repayment", "finance", "debt"],
   },
   credit_card_repayment: {
     label: "Credit card repayment",
@@ -189,6 +245,7 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     hmrcCode: null,
     isBusiness: false,
     evidenceRecommendation: null,
+    keywords: ["credit card", "card payment", "repayment", "visa", "mastercard"],
   },
   transfer_between_accounts: {
     label: "Transfer between accounts",
@@ -196,6 +253,7 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     hmrcCode: null,
     isBusiness: false,
     evidenceRecommendation: null,
+    keywords: ["transfer", "between accounts", "own account", "savings transfer"],
   },
   tax_payment: {
     label: "Tax payment",
@@ -203,6 +261,7 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     hmrcCode: null,
     isBusiness: false,
     evidenceRecommendation: null,
+    keywords: ["tax", "hmrc", "self assessment", "payment on account"],
   },
   other_personal_expense: {
     label: "Other personal expense",
@@ -210,6 +269,7 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     hmrcCode: null,
     isBusiness: false,
     evidenceRecommendation: null,
+    keywords: ["other", "misc", "uncategorised"],
   },
   business_turnover: {
     label: "Business income / turnover",
@@ -218,6 +278,7 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     isBusiness: true,
     evidenceRecommendation:
       "Keep invoices or payment records — this counts as trading turnover.",
+    keywords: ["business", "turnover", "sales", "invoice", "self employed"],
   },
   business_refund: {
     label: "Business refund",
@@ -225,6 +286,7 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     hmrcCode: null,
     isBusiness: true,
     evidenceRecommendation: null,
+    keywords: ["refund", "business refund", "return"],
   },
   owner_transfer: {
     label: "Owner transfer",
@@ -232,6 +294,7 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     hmrcCode: null,
     isBusiness: false,
     evidenceRecommendation: null,
+    keywords: ["owner", "transfer", "drawings", "director"],
   },
   other_business_income: {
     label: "Other business income",
@@ -239,13 +302,24 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     hmrcCode: null,
     isBusiness: true,
     evidenceRecommendation: null,
+    keywords: ["business income", "other income", "misc"],
   },
   software_digital: {
     label: "Software / digital tools",
     categorySlug: "subscriptions",
-    hmrcCode: "other_business_expenses",
+    hmrcCode: "phone_office_stationery",
     isBusiness: true,
     evidenceRecommendation: "Receipt or invoice helps for software subscriptions.",
+    keywords: [
+      "software",
+      "app",
+      "subscription",
+      "saas",
+      "cursor",
+      "adobe",
+      "digital",
+      "cloud",
+    ],
   },
   biz_phone_internet: {
     label: "Phone / internet",
@@ -253,6 +327,7 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     hmrcCode: "phone_office_stationery",
     isBusiness: true,
     evidenceRecommendation: "Phone or broadband bill supports business use.",
+    keywords: ["phone", "mobile", "broadband", "internet", "business line"],
   },
   stock_materials: {
     label: "Products, stock or materials",
@@ -260,6 +335,7 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     hmrcCode: "cost_of_goods",
     isBusiness: true,
     evidenceRecommendation: "Supplier invoice is ideal for stock and materials.",
+    keywords: ["stock", "materials", "inventory", "supplier", "goods", "cogs"],
   },
   equipment_tools: {
     label: "Equipment or tools",
@@ -267,6 +343,7 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     hmrcCode: "equipment_tools",
     isBusiness: true,
     evidenceRecommendation: "Keep the purchase receipt for equipment and tools.",
+    keywords: ["equipment", "tools", "hardware", "laptop", "machine"],
   },
   fuel_travel: {
     label: "Fuel, parking or travel",
@@ -274,6 +351,7 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     hmrcCode: "car_van_travel",
     isBusiness: true,
     evidenceRecommendation: "Mileage log or travel receipt strengthens your records.",
+    keywords: ["fuel", "parking", "travel", "mileage", "car", "van", "train"],
   },
   advertising_marketing: {
     label: "Advertising, website or marketing",
@@ -281,6 +359,7 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     hmrcCode: "advertising_marketing",
     isBusiness: true,
     evidenceRecommendation: "Invoice or receipt for ads and marketing costs.",
+    keywords: ["advertising", "marketing", "ads", "website", "seo", "social"],
   },
   training_education: {
     label: "Training or education",
@@ -288,6 +367,7 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     hmrcCode: "training",
     isBusiness: true,
     evidenceRecommendation: "Course invoice or booking confirmation.",
+    keywords: ["training", "course", "education", "cpd", "learning"],
   },
   professional_help: {
     label: "Professional help",
@@ -295,6 +375,7 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     hmrcCode: "accountancy_legal_professional",
     isBusiness: true,
     evidenceRecommendation: "Professional invoice is the best evidence.",
+    keywords: ["accountant", "solicitor", "legal", "professional", "consultant"],
   },
   bank_fees_finance: {
     label: "Bank fees / finance charges",
@@ -302,6 +383,7 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     hmrcCode: "bank_credit_card_charges",
     isBusiness: true,
     evidenceRecommendation: "Bank statement usually covers fees and charges.",
+    keywords: ["bank fee", "finance charge", "interest", "merchant fee"],
   },
   premises_utilities: {
     label: "Business premises / rent / utilities",
@@ -309,6 +391,7 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     hmrcCode: "rent_rates_power",
     isBusiness: true,
     evidenceRecommendation: "Utility or premises bill supports this expense.",
+    keywords: ["premises", "rent", "rates", "utilities", "office", "shop"],
   },
   repairs_maintenance: {
     label: "Repairs or maintenance",
@@ -316,6 +399,7 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     hmrcCode: "repairs_maintenance",
     isBusiness: true,
     evidenceRecommendation: "Repair invoice or receipt.",
+    keywords: ["repair", "maintenance", "fix", "service"],
   },
   mixed_personal_business: {
     label: "Mixed personal and business",
@@ -325,6 +409,7 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     evidenceRecommendation:
       "Note how much was for business — a receipt plus your percentage is helpful.",
     requiresBusinessUsePercent: true,
+    keywords: ["mixed", "personal and business", "split", "partial"],
   },
   other_business_expense: {
     label: "Other business expense",
@@ -332,6 +417,7 @@ export const CHOICE_SPECS: Record<CategoryChoiceId, ChoiceSpec> = {
     hmrcCode: "other_business_expenses",
     isBusiness: true,
     evidenceRecommendation: null,
+    keywords: ["other", "misc", "business expense"],
   },
 };
 
@@ -393,10 +479,14 @@ const BUSINESS_EXPENSE_IDS: CategoryChoiceId[] = [
 ];
 
 function toChoices(ids: CategoryChoiceId[]): PlainChoice[] {
-  return ids.map((id) => ({
-    id,
-    label: CHOICE_SPECS[id].label,
-  }));
+  return ids.map((id) => {
+    const spec = CHOICE_SPECS[id];
+    return {
+      id,
+      label: spec.label,
+      keywords: spec.keywords,
+    };
+  });
 }
 
 export function getCategoryChoices(

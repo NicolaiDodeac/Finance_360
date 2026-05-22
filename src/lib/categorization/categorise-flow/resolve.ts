@@ -5,6 +5,7 @@ import type {
   CategoryChoiceId,
   ResolvedCategorisation,
 } from "@/lib/categorization/categorise-flow/types";
+import { resolveHmrcFromChoice } from "@/lib/categorization/hmrc-resolution";
 import type { CategoryRow } from "@/lib/categories/queries";
 import type { HmrcCategoryRow } from "@/lib/hmrc/queries";
 
@@ -14,14 +15,6 @@ function findCategoryBySlug(
 ): CategoryRow | null {
   if (!slug) return null;
   return categories.find((c) => c.slug === slug) ?? null;
-}
-
-function findHmrcByCode(
-  hmrcCategories: HmrcCategoryRow[],
-  code: string | null
-): HmrcCategoryRow | null {
-  if (!code) return null;
-  return hmrcCategories.find((h) => h.code === code) ?? null;
 }
 
 export function resolveCategoryChoice(
@@ -34,10 +27,11 @@ export function resolveCategoryChoice(
 ): ResolvedCategorisation {
   const spec = CHOICE_SPECS[choiceId];
   const category = findCategoryBySlug(categories, spec.categorySlug);
-  const hmrc =
-    hmrcOverrideId !== undefined
-      ? hmrcCategories.find((h) => h.id === hmrcOverrideId) ?? null
-      : findHmrcByCode(hmrcCategories, spec.hmrcCode);
+  const hmrc = resolveHmrcFromChoice(
+    hmrcCategories,
+    spec.hmrcCode,
+    hmrcOverrideId
+  );
 
   let percent: number | null = null;
   if (spec.isBusiness) {
@@ -54,6 +48,7 @@ export function resolveCategoryChoice(
     categoryName: category?.name ?? spec.label,
     hmrcCategoryId: hmrc?.id ?? null,
     hmrcCategoryName: hmrc?.name ?? null,
+    hmrcCategoryCode: hmrc?.code ?? null,
     isBusiness: spec.isBusiness,
     businessUsePercent: percent,
     markReviewRecommended: false,

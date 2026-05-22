@@ -8,7 +8,7 @@ import type {
 } from "@/lib/receipts/types";
 
 const ATTACHED_TRANSACTION_SELECT =
-  "id, transaction_date, description, merchant_name, amount, direction, is_business, receipt_id";
+  "id, transaction_date, description, merchant_name, amount, direction, is_business, receipt_id, account:accounts(id, name, account_type)";
 
 function attachTaxYears(
   rows: ReceiptRow[],
@@ -134,8 +134,7 @@ export async function getMatchableTransactions(
     .from("transactions")
     .select(ATTACHED_TRANSACTION_SELECT)
     .eq("user_id", userId)
-    .eq("is_business", true)
-    .eq("direction", "expense")
+    .neq("direction", "transfer")
     .order("transaction_date", { ascending: false })
     .limit(200);
 

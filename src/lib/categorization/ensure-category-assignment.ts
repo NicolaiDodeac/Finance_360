@@ -5,6 +5,7 @@ import {
 } from "@/lib/categorization/categorise-flow/income-types";
 import { isCategoryChoiceId } from "@/lib/categorization/categorise-flow/prefill";
 import type { GroupCategorisationInput } from "@/lib/categorization/assistant-types";
+import { ensureHmrcCategoryAssignment } from "@/lib/categorization/ensure-hmrc-assignment";
 import { ensureCategoryBySlug } from "@/lib/categories/ensure-slug";
 
 function categorySlugFromGroupInput(
@@ -27,19 +28,17 @@ export async function ensureCategoryAssignment(
   userId: string,
   input: GroupCategorisationInput
 ): Promise<GroupCategorisationInput> {
-  if (input.mark_review_recommended || input.category_id) {
-    return input;
+  let next = input;
+
+  if (!next.mark_review_recommended && !next.category_id) {
+    const slug = categorySlugFromGroupInput(next);
+    if (slug) {
+      const category = await ensureCategoryBySlug(userId, slug);
+      if (category?.id) {
+        next = { ...next, category_id: category.id };
+      }
+    }
   }
 
-  const slug = categorySlugFromGroupInput(input);
-  if (!slug) {
-    return input;
-  }
-
-  const category = await ensureCategoryBySlug(userId, slug);
-  if (!category?.id) {
-    return input;
-  }
-
-  return { ...input, category_id: category.id };
+  return ensureHmrcCategoryAssignment(next);
 }
