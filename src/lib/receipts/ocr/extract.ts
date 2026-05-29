@@ -14,6 +14,32 @@ const OCR_IMAGE_MIMES = new Set([
   "image/webp",
 ]);
 
+/** Hard cap so a slow/hanging OCR engine never pins the review screen. */
+export const OCR_TIMEOUT_MS = 45_000;
+
+class OcrTimeoutError extends Error {
+  constructor() {
+    super("OCR timed out");
+    this.name = "OcrTimeoutError";
+  }
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new OcrTimeoutError()), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      }
+    );
+  });
+}
+
 async function extractImageText(
   buffer: Buffer,
   mimeType: string | null
@@ -36,7 +62,10 @@ async function extractImageText(
     const { createWorker } = await import("tesseract.js");
     const worker = await createWorker("eng");
     try {
-      const result = await worker.recognize(enhanced.buffer);
+      const result = await withTimeout(
+        worker.recognize(enhanced.buffer),
+        OCR_TIMEOUT_MS
+      );
       const text = result.data.text?.trim() ?? "";
       if (!text) {
         return {
@@ -47,9 +76,17 @@ async function extractImageText(
       }
       return { text };
     } finally {
-      await worker.terminate();
+      // Always free the worker, even on timeout, so it can't keep running.
+      await worker.terminate().catch(() => undefined);
     }
-  } catch {
+  } catch (err) {
+    if (err instanceof OcrTimeoutError) {
+      return {
+        text: "",
+        error:
+          "Reading this photo took too long. Add the details manually or try a clearer photo.",
+      };
+    }
     return {
       text: "",
       error:

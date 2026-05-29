@@ -55,6 +55,15 @@ const RECEIPT_PATTERNS: ReceiptPatternRule[] = [
     evidenceHint: "Receipt saved as proof.",
   },
   {
+    id: "diy_hardware",
+    pattern:
+      /\b(b\s*&\s*q|b\s*and\s*q|screwfix|wickes|homebase|toolstation|travis perkins|jewson|builders?\s+merchant|hardware|timber|plywood|screws?|nails?|plaster(?:board)?|cement|sealant|grout|decking|paving|insulation|weedkiller|secateur|compost|topsoil)\b/i,
+    businessChoiceId: "stock_materials",
+    personalChoiceId: "other_personal_expense",
+    summaryTitle: "Materials / DIY",
+    evidenceHint: "Receipt saved as proof.",
+  },
+  {
     id: "beauty_supplies",
     pattern:
       /\b(beauty|salon|brows?|lashes|pigment|needle|gloves|wipes|disinfectant|numbing|aftercare|cosmetics?|makeup supplies?)\b/i,
@@ -66,7 +75,7 @@ const RECEIPT_PATTERNS: ReceiptPatternRule[] = [
   {
     id: "software",
     pattern:
-      /\b(software|subscription|canva|cursor|adobe|booksy|saas|app store|google play)\b/i,
+      /\b(software|canva|cursor|adobe|booksy|saas|app\s+subscription|digital subscription)\b/i,
     businessChoiceId: "software_digital",
     personalChoiceId: "subscriptions",
     summaryTitle: "Business software expense",
@@ -135,13 +144,19 @@ const RECEIPT_PATTERNS: ReceiptPatternRule[] = [
   },
 ];
 
-/** Groups that are usually personal — don't default to a business purpose. */
+/**
+ * Groups that are ambiguous or usually personal — don't default to a business
+ * purpose. The user picks business/personal and the category still maps
+ * sensibly either way. DIY/building materials are genuinely either (home
+ * improvement vs. trade materials), so we let the user decide.
+ */
 const PERSONAL_LEANING_PATTERNS = new Set([
   "groceries",
   "eating_out",
   "health",
   "travel",
   "bills_utilities",
+  "diy_hardware",
 ]);
 
 const INCOME_HINT_PATTERN =

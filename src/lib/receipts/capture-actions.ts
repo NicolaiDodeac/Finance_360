@@ -82,6 +82,27 @@ function revalidateCapturePaths() {
   }
 }
 
+type ReceiptLogFields = Record<string, unknown>;
+
+/** Structured, low-noise pipeline logging. */
+function logReceiptStage(stage: string, fields: ReceiptLogFields = {}): void {
+  const parts = Object.entries(fields)
+    .filter(([, v]) => v !== undefined && v !== null)
+    .map(([k, v]) => `${k}=${v}`)
+    .join(" ");
+  console.info(`[receipt] ${stage}${parts ? ` ${parts}` : ""}`);
+}
+
+function logReceiptError(
+  stage: string,
+  receiptId: string,
+  error: unknown
+): void {
+  const message =
+    error instanceof Error ? error.message : String(error ?? "unknown error");
+  console.error(`[receipt:error] ${stage} id=${receiptId} error=${message}`);
+}
+
 function applyExtractionToReceiptFields(
   extraction: ReceiptOcrExtraction,
   taxYearId: string | null
@@ -145,6 +166,12 @@ export async function captureReceipt(
   const mimeType = guessMimeType(file.name, file.type);
   const buffer = Buffer.from(await file.arrayBuffer());
 
+  logReceiptStage("create row started", {
+    mime: mimeType,
+    size: file.size,
+    path: storagePath,
+  });
+
   const supabase = await createClient();
   const { error: uploadError } = await supabase.storage
     .from(RECEIPTS_BUCKET)
@@ -154,8 +181,11 @@ export async function captureReceipt(
     });
 
   if (uploadError) {
+    logReceiptError("storage upload", "(pending)", uploadError);
     return { success: false, error: uploadError.message };
   }
+
+  logReceiptStage("storage upload complete", { path: storagePath });
 
   const { data, error } = await supabase
     .from("receipts")
@@ -181,13 +211,67 @@ export async function captureReceipt(
 
   if (error) {
     await supabase.storage.from(RECEIPTS_BUCKET).remove([storagePath]);
+    logReceiptError("create row", "(pending)", error);
     return { success: false, error: error.message };
   }
 
   await ensureReceiptAccounts(user.id, supabase);
 
+  logReceiptStage("create row complete", { id: data.id, status: "processing" });
+
   revalidateCapturePaths();
   return { success: true, data: { id: data.id } };
+}
+
+/**
+ * Escape hatch: force a receipt out of `processing` into `needs_review`.
+ * Used by the review-page watchdog so a slow/hung OCR run can never trap the
+ * user on the "Reading your receipt…" spinner. Keeps the uploaded file as proof.
+ */
+export async function markReceiptNeedsReview(
+  receiptId: string,
+  reason: string
+): Promise<ActionResult<void>> {
+  const user = await requireAuth();
+  const receipt = await getReceiptById(user.id, receiptId);
+
+  if (!receipt) {
+    return { success: false, error: "Receipt not found." };
+  }
+
+  // Don't clobber a receipt that already finished or got linked.
+  if (receipt.status !== "processing") {
+    return { success: true };
+  }
+
+  const supabase = await createClient();
+  const existingOcr =
+    receipt.ocr_data && typeof receipt.ocr_data === "object"
+      ? (receipt.ocr_data as Record<string, unknown>)
+      : {};
+
+  const { error } = await supabase
+    .from("receipts")
+    .update({
+      status: "needs_review",
+      ocr_data: {
+        ...existingOcr,
+        ocr_status: "skipped",
+        ocr_error: reason,
+      },
+    })
+    .eq("id", receiptId)
+    .eq("user_id", user.id);
+
+  if (error) {
+    logReceiptError("mark needs_review", receiptId, error);
+    return { success: false, error: error.message };
+  }
+
+  logReceiptStage("mark needs_review", { id: receiptId, reason });
+  revalidateCapturePaths();
+  revalidatePath(`/receipts/review/${receiptId}`);
+  return { success: true };
 }
 
 export async function getReceiptCaptureReview(
@@ -414,6 +498,7 @@ export async function createTransactionFromReceipt(
     );
   } else {
     const choiceId =
+      input.category_choice_id ??
       choiceIdForPurpose(input.purpose, classification) ??
       (input.purpose === "business"
         ? "other_business_expense"
@@ -551,7 +636,14 @@ export async function runReceiptCaptureOcr(
   return retryReceiptOcr(receiptId);
 }
 
-/** Re-run OCR on an existing receipt file and refresh metadata. */
+/**
+ * Re-run OCR on an existing receipt file and refresh metadata.
+ *
+ * Reliability contract: this never leaves a receipt in `processing`. Every exit
+ * path (success, no-text, download error, or unexpected throw/timeout) writes a
+ * terminal status, and a `finally` safety net flips any still-`processing` row
+ * to `needs_review`. The uploaded original is always kept as proof.
+ */
 export async function retryReceiptOcr(
   receiptId: string
 ): Promise<ActionResult<RetryReceiptOcrResult>> {
@@ -563,77 +655,167 @@ export async function retryReceiptOcr(
   }
 
   const supabase = await createClient();
-  const { data: fileData, error: downloadError } = await supabase.storage
-    .from(RECEIPTS_BUCKET)
-    .download(receipt.storage_path);
+  const startedAt = Date.now();
+  // Set once we have written a terminal (non-processing) status to the row.
+  let resolvedStatus: ReceiptStatus | null = null;
 
-  if (downloadError || !fileData) {
-    return {
-      success: false,
-      error: downloadError?.message ?? "Could not load receipt file.",
-    };
-  }
+  const existingOcr =
+    receipt.ocr_data && typeof receipt.ocr_data === "object"
+      ? (receipt.ocr_data as Record<string, unknown>)
+      : {};
 
-  const buffer = Buffer.from(await fileData.arrayBuffer());
-  const mimeType =
-    receipt.mime_type ?? guessMimeType(receipt.original_filename ?? ".jpg");
-  const extraction = await extractReceiptFromBuffer(buffer, mimeType);
-
-  if (extraction.ocrError && !extraction.rawText?.trim()) {
+  async function failToNeedsReview(
+    stage: string,
+    error: unknown,
+    friendly: string
+  ): Promise<ActionResult<RetryReceiptOcrResult>> {
+    logReceiptError(stage, receiptId, error);
     await supabase
       .from("receipts")
       .update({
         status: "needs_review",
         ocr_data: {
+          ...existingOcr,
           ...extractionToOcrData(EMPTY_RECEIPT_EXTRACTION),
-          scan_error: extraction.ocrError ?? null,
+          ocr_status: "failed",
+          ocr_error: friendly,
+          scan_error: friendly,
+        },
+      })
+      .eq("id", receiptId)
+      .eq("user_id", user.id);
+    resolvedStatus = "needs_review";
+    revalidateCapturePaths();
+    revalidatePath(`/receipts/review/${receiptId}`);
+    return { success: false, error: friendly };
+  }
+
+  try {
+    logReceiptStage("ocr start", {
+      id: receiptId,
+      mime: receipt.mime_type,
+      size: receipt.file_size_bytes,
+      path: receipt.storage_path,
+      status: receipt.status,
+    });
+
+    const { data: fileData, error: downloadError } = await supabase.storage
+      .from(RECEIPTS_BUCKET)
+      .download(receipt.storage_path);
+
+    if (downloadError || !fileData) {
+      return await failToNeedsReview(
+        "storage download",
+        downloadError,
+        "We couldn't open the saved file. Add the details manually or try again."
+      );
+    }
+
+    const buffer = Buffer.from(await fileData.arrayBuffer());
+    const mimeType =
+      receipt.mime_type ?? guessMimeType(receipt.original_filename ?? ".jpg");
+
+    logReceiptStage("text extraction start", { id: receiptId });
+    const extraction = await extractReceiptFromBuffer(buffer, mimeType);
+    logReceiptStage("text extraction complete", {
+      id: receiptId,
+      fields: extraction.fieldsFound.join(",") || "none",
+      reviewLevel: extraction.reviewLevel,
+      elapsedMs: Date.now() - startedAt,
+    });
+
+    // No usable text → keep the file, route to manual review (not stuck).
+    if (extraction.ocrError && !extraction.rawText?.trim()) {
+      return await failToNeedsReview(
+        "ocr no-text",
+        extraction.ocrError,
+        extraction.ocrError ??
+          "We couldn't read this photo. Add the details manually."
+      );
+    }
+
+    const taxYearId = receipt.tax_year_id;
+    const fields = applyExtractionToReceiptFields(extraction, taxYearId);
+    const status = deriveReceiptStatus(
+      {
+        merchant_name: fields.merchant_name,
+        total_amount: fields.total_amount,
+        receipt_date: fields.receipt_date,
+        status: "ready",
+      },
+      extraction
+    );
+
+    logReceiptStage("db update start", { id: receiptId, status });
+    const { error } = await supabase
+      .from("receipts")
+      .update({
+        ...fields,
+        status,
+        ocr_data: {
+          ...(fields.ocr_data as Record<string, unknown>),
+          ocr_status: "processed",
         },
       })
       .eq("id", receiptId)
       .eq("user_id", user.id);
 
+    if (error) {
+      return await failToNeedsReview(
+        "db update",
+        error,
+        "We read the receipt but couldn't save it. Try again."
+      );
+    }
+
+    resolvedStatus = status;
+    logReceiptStage("db update complete", {
+      id: receiptId,
+      status,
+      elapsedMs: Date.now() - startedAt,
+    });
+
     revalidateCapturePaths();
     revalidatePath(`/receipts/review/${receiptId}`);
 
     return {
-      success: false,
-      error: extraction.ocrError,
+      success: true,
+      data: {
+        status,
+        fieldsFound: extraction.fieldsFound,
+        merchant: fields.merchant_name,
+        receiptDate: fields.receipt_date,
+        totalAmount: fields.total_amount,
+      },
     };
+  } catch (err) {
+    return await failToNeedsReview(
+      "ocr unexpected",
+      err,
+      "We couldn't finish reading this receipt. Add the details manually or try again."
+    );
+  } finally {
+    // Safety net: a receipt must never stay in `processing` after this runs.
+    if (resolvedStatus === null) {
+      try {
+        await supabase
+          .from("receipts")
+          .update({
+            status: "needs_review",
+            ocr_data: {
+              ...existingOcr,
+              ocr_status: "failed",
+              ocr_error: "OCR did not complete.",
+            },
+          })
+          .eq("id", receiptId)
+          .eq("user_id", user.id)
+          .eq("status", "processing");
+        revalidatePath(`/receipts/review/${receiptId}`);
+        logReceiptStage("ocr safety-net needs_review", { id: receiptId });
+      } catch (netErr) {
+        logReceiptError("ocr safety-net", receiptId, netErr);
+      }
+    }
   }
-
-  const taxYearId = receipt.tax_year_id;
-  const fields = applyExtractionToReceiptFields(extraction, taxYearId);
-  const status = deriveReceiptStatus(
-    {
-      merchant_name: fields.merchant_name,
-      total_amount: fields.total_amount,
-      receipt_date: fields.receipt_date,
-      status: "ready",
-    },
-    extraction
-  );
-
-  const { error } = await supabase
-    .from("receipts")
-    .update({ ...fields, status })
-    .eq("id", receiptId)
-    .eq("user_id", user.id);
-
-  if (error) {
-    return { success: false, error: error.message };
-  }
-
-  revalidateCapturePaths();
-  revalidatePath(`/receipts/review/${receiptId}`);
-
-  return {
-    success: true,
-    data: {
-      status,
-      fieldsFound: extraction.fieldsFound,
-      merchant: fields.merchant_name,
-      receiptDate: fields.receipt_date,
-      totalAmount: fields.total_amount,
-    },
-  };
 }

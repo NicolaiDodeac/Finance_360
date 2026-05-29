@@ -251,14 +251,11 @@ function SuggestedBlock({
         Suggested
       </p>
       <dl className="grid gap-2 text-sm">
-        {suggested.purposeLabel ? (
-          <ReviewLine label="What was this for?" value={suggested.purposeLabel} />
-        ) : null}
-        <ReviewLine label="Category" value={suggested.categoryLabel} />
         <ReviewLine
           label="Personal or business"
-          value={suggested.businessPersonalLabel}
+          value={suggested.purposeLabel || suggested.businessPersonalLabel}
         />
+        <ReviewLine label="Category" value={suggested.categoryLabel} />
         {!hideHmrc && suggested.hmrcLabel ? (
           <ReviewLine label="Tax category" value={suggested.hmrcLabel} />
         ) : null}

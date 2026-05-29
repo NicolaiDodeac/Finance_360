@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useEffect, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Pencil, Search } from "lucide-react";
@@ -12,10 +12,13 @@ import {
 import { ReceiptAttachPanel } from "@/components/receipts/receipt-attach-panel";
 import { ReceiptCategorisationReview } from "@/components/receipts/receipt-categorisation-review";
 import { ReceiptNeedsReviewPanel } from "@/components/receipts/receipt-needs-review-panel";
-import { ReceiptFileIcon } from "@/components/receipts/receipt-file-icon";
+import { ReceiptProofPreview } from "@/components/receipts/receipt-proof-preview";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { getCategoryChoices } from "@/lib/categorization/categorise-flow/mappings";
+import type { CategoryChoiceId } from "@/lib/categorization/categorise-flow/types";
 import {
   ReceiptDeleteButton,
   confirmDeleteReceipt,
@@ -23,7 +26,6 @@ import {
 import {
   attachReceiptToTransaction,
   deleteReceipt,
-  getReceiptPreviewUrl,
   updateReceiptMetadata,
 } from "@/lib/receipts/actions";
 import { createTransactionFromReceipt } from "@/lib/receipts/capture-actions";
@@ -53,12 +55,6 @@ interface ReceiptCaptureReviewViewProps {
   taxYears?: TaxYearRow[];
 }
 
-const PURPOSE_OPTIONS: { value: ReceiptPurpose; label: string }[] = [
-  { value: "personal", label: "Personal purchase" },
-  { value: "business", label: "Business purchase" },
-  { value: "not_sure", label: "Not sure" },
-];
-
 export function ReceiptCaptureReviewView({
   review,
   categories,
@@ -74,21 +70,28 @@ export function ReceiptCaptureReviewView({
     financeMode,
     similarReceipts,
   } = review;
-  const reviewLevel = extraction.reviewLevel ?? "medium";
   const uncertainHint = buildUncertainHint(extraction);
   const isDev = process.env.NODE_ENV === "development";
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [showIncome, setShowIncome] = useState(false);
-  const [purpose, setPurpose] = useState<ReceiptPurpose>(
+  const [purpose, setPurposeState] = useState<ReceiptPurpose>(
     review.creationSuggestion.purposeDefault
   );
   const [payment, setPayment] = useState<ReceiptPaymentMethod | null>(
     receipt.payment_method
   );
+  // null = use the detected/suggested category; otherwise a user override.
+  const [categoryChoiceId, setCategoryChoiceId] =
+    useState<CategoryChoiceId | null>(null);
+
+  // Changing the purpose invalidates a category chosen for the old purpose.
+  function setPurpose(next: ReceiptPurpose) {
+    setPurposeState(next);
+    setCategoryChoiceId(null);
+  }
 
   const showBusinessPurpose = showsBusinessFeatures(financeMode);
   const hasBankMatch = Boolean(suggestedMatch);
@@ -101,6 +104,7 @@ export function ReceiptCaptureReviewView({
         rawText: extraction.rawText,
         paymentMethod: payment,
         purpose,
+        categoryChoiceId,
         categories,
         hmrcCategories,
       }),
@@ -110,9 +114,15 @@ export function ReceiptCaptureReviewView({
       extraction.rawText,
       payment,
       purpose,
+      categoryChoiceId,
       categories,
       hmrcCategories,
     ]
+  );
+
+  const categoryOptions = useMemo(
+    () => getCategoryChoices(purpose === "business" ? "business" : "personal", "expense"),
+    [purpose]
   );
 
   const needsPayment =
@@ -141,18 +151,6 @@ export function ReceiptCaptureReviewView({
       router.refresh();
     });
   }
-
-  useEffect(() => {
-    let cancelled = false;
-    getReceiptPreviewUrl(receipt.id).then((result) => {
-      if (!cancelled && result.success && result.data) {
-        setPreviewUrl(result.data.url);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [receipt.id]);
 
   const attached = receipt.attached_transaction;
 
@@ -193,6 +191,7 @@ export function ReceiptCaptureReviewView({
       const result = await createTransactionFromReceipt(receipt.id, {
         purpose,
         payment_method: payment,
+        category_choice_id: categoryChoiceId,
       });
       if (!result.success) {
         setError(result.error ?? "Could not save.");
@@ -289,51 +288,48 @@ export function ReceiptCaptureReviewView({
         </p>
       ) : null}
 
-      <div className="space-y-2">
-      <p className="text-xs font-medium text-muted-foreground">
-        We found these details
-      </p>
-      <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
-        <ReceiptFileIcon mimeType={receipt.mime_type} />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium">
-            {receipt.merchant_name ?? receipt.original_filename ?? "Receipt"}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {amountLabel}
-            {receipt.receipt_date
-              ? ` · ${formatTransactionDate(receipt.receipt_date)}`
-              : ""}
-          </p>
-          {previewUrl ? (
-            <a
-              href={previewUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-primary hover:underline"
+      <div className="space-y-3">
+        <p className="text-xs font-medium text-muted-foreground">
+          We found these details
+        </p>
+        <ReceiptProofPreview
+          receiptId={receipt.id}
+          mimeType={receipt.mime_type}
+          label={receipt.merchant_name ?? receipt.original_filename ?? "Receipt"}
+        />
+        <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium">
+              {receipt.merchant_name ?? receipt.original_filename ?? "Receipt"}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {amountLabel}
+              {receipt.receipt_date
+                ? ` · ${formatTransactionDate(receipt.receipt_date)}`
+                : ""}
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Tap the photo above to check the receipt
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={isPending}
+              onClick={() => setEditing((v) => !v)}
             >
-              View photo
-            </a>
-          ) : null}
+              <Pencil className="h-3.5 w-3.5" />
+              Edit
+            </Button>
+            <ReceiptDeleteButton
+              variant="inline"
+              onDelete={handleDelete}
+              disabled={isPending}
+            />
+          </div>
         </div>
-        <div className="flex shrink-0 items-center gap-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={isPending}
-            onClick={() => setEditing((v) => !v)}
-          >
-            <Pencil className="h-3.5 w-3.5" />
-            Edit
-          </Button>
-          <ReceiptDeleteButton
-            variant="inline"
-            onDelete={handleDelete}
-            disabled={isPending}
-          />
-        </div>
-      </div>
       </div>
 
       {editing ? (
@@ -369,44 +365,83 @@ export function ReceiptCaptureReviewView({
               disabled={isPending}
             />
           </ReviewField>
+          <ReviewField label="VAT (optional)" id="vat_amount">
+            <Input
+              id="vat_amount"
+              name="vat_amount"
+              type="number"
+              min={0}
+              step="0.01"
+              defaultValue={receipt.vat_amount ?? ""}
+              disabled={isPending}
+            />
+          </ReviewField>
+          <ReviewField label="Payment method" id="payment_method_select">
+            <Select
+              id="payment_method_select"
+              name="payment_method"
+              value={payment ?? ""}
+              disabled={isPending}
+              onChange={(e) =>
+                setPayment((e.target.value || null) as ReceiptPaymentMethod | null)
+              }
+            >
+              <option value="">Not sure</option>
+              <option value="cash">Cash</option>
+              <option value="card">Card</option>
+              <option value="contactless">Contactless</option>
+            </Select>
+          </ReviewField>
           <input
             type="hidden"
             name="tax_year_id"
             value={receipt.tax_year_id ?? ""}
           />
           <input type="hidden" name="notes" value={receipt.notes ?? ""} />
-          <input
-            type="hidden"
-            name="payment_method"
-            value={payment ?? ""}
-          />
           <Button type="submit" className="w-full" disabled={isPending}>
             Save details
           </Button>
         </form>
       ) : null}
 
-      {showBusinessPurpose && reviewLevel !== "high" ? (
+      {showBusinessPurpose ? (
         <section className="space-y-3 rounded-xl border border-border bg-card p-4">
-          <p className="text-sm font-medium">What was this for?</p>
-          <div className="grid gap-2">
-            {PURPOSE_OPTIONS.map((opt) => (
-              <label
-                key={opt.value}
-                className="flex cursor-pointer items-center gap-3 rounded-lg border border-border px-3 py-3 has-[:checked]:border-primary has-[:checked]:ring-1 has-[:checked]:ring-primary"
-              >
-                <input
-                  type="radio"
-                  name="purpose"
-                  value={opt.value}
-                  checked={purpose === opt.value}
-                  disabled={isPending}
-                  onChange={() => setPurpose(opt.value)}
-                />
-                <span className="text-sm">{opt.label}</span>
-              </label>
-            ))}
+          <p className="text-sm font-medium">Personal or business?</p>
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              type="button"
+              variant={purpose === "personal" ? "default" : "outline"}
+              className="h-12"
+              disabled={isPending}
+              onClick={() => setPurpose("personal")}
+            >
+              Personal
+            </Button>
+            <Button
+              type="button"
+              variant={purpose === "business" ? "default" : "outline"}
+              className="h-12"
+              disabled={isPending}
+              onClick={() => setPurpose("business")}
+            >
+              Business
+            </Button>
           </div>
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={() => setPurpose("not_sure")}
+            className={
+              purpose === "not_sure"
+                ? "text-xs font-medium text-foreground underline underline-offset-2"
+                : "text-xs text-muted-foreground underline-offset-2 hover:underline"
+            }
+          >
+            Not sure yet
+          </button>
+          <p className="text-xs text-muted-foreground">
+            We preset the category to match — change it under “Change details”.
+          </p>
         </section>
       ) : null}
 
@@ -520,26 +555,53 @@ export function ReceiptCaptureReviewView({
             isPending={isPending}
             onConfirm={handleCreateAndLink}
             purposePanel={
-              showBusinessPurpose ? (
-                <div className="grid gap-2">
-                  {PURPOSE_OPTIONS.map((opt) => (
-                    <label
-                      key={opt.value}
-                      className="flex cursor-pointer items-center gap-3 rounded-lg border border-border px-3 py-3 has-[:checked]:border-primary"
+              <div className="space-y-4">
+                {showBusinessPurpose ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      type="button"
+                      variant={purpose === "personal" ? "default" : "outline"}
+                      className="h-11"
+                      disabled={isPending}
+                      onClick={() => setPurpose("personal")}
                     >
-                      <input
-                        type="radio"
-                        name="purpose-change"
-                        value={opt.value}
-                        checked={purpose === opt.value}
-                        disabled={isPending}
-                        onChange={() => setPurpose(opt.value)}
-                      />
-                      <span className="text-sm">{opt.label}</span>
-                    </label>
-                  ))}
-                </div>
-              ) : undefined
+                      Personal
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={purpose === "business" ? "default" : "outline"}
+                      className="h-11"
+                      disabled={isPending}
+                      onClick={() => setPurpose("business")}
+                    >
+                      Business
+                    </Button>
+                  </div>
+                ) : null}
+                {purpose !== "not_sure" && categoryOptions.length > 0 ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="category-choice" className="text-xs">
+                      Category
+                    </Label>
+                    <Select
+                      id="category-choice"
+                      value={suggestion.categoryChoiceId ?? ""}
+                      disabled={isPending}
+                      onChange={(e) =>
+                        setCategoryChoiceId(
+                          (e.target.value || null) as CategoryChoiceId | null
+                        )
+                      }
+                    >
+                      {categoryOptions.map((opt) => (
+                        <option key={opt.id} value={opt.id}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                ) : null}
+              </div>
             }
           />
           <Button

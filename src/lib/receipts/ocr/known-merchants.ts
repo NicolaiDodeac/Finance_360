@@ -140,4 +140,40 @@ export const KNOWN_MERCHANTS: KnownMerchantDef[] = [
     patterns: [/\bC[O0][-\s]?[O0]P\b/i, /\bCOOP\b/i, /\bTHE\s+CO[\-\s]?OP\b/i],
     compactKeys: ["COOP", "THECOOP"],
   },
+  {
+    id: "bq",
+    displayName: "B&Q",
+    patterns: [/\bB\s*&\s*Q\b/i, /\bB\s*and\s*Q\b/i, /\bb[-\s]?and[-\s]?q\b/i],
+    compactKeys: ["BANDQ"],
+  },
+  {
+    id: "screwfix",
+    displayName: "Screwfix",
+    patterns: [/\bSCR[E3]WF[I1]X\b/i, /\bSCREWFIX\b/i],
+    compactKeys: ["SCREWFIX"],
+  },
+  {
+    id: "wickes",
+    displayName: "Wickes",
+    patterns: [/\bW[I1]CK[E3][S5]\b/i, /\bWICKES\b/i],
+    compactKeys: ["WICKES"],
+  },
+  {
+    id: "homebase",
+    displayName: "Homebase",
+    patterns: [/\bH[O0]M[E3]B[A4][S5][E3]\b/i, /\bHOMEBASE\b/i],
+    compactKeys: ["HOMEBASE"],
+  },
+  {
+    id: "toolstation",
+    displayName: "Toolstation",
+    patterns: [/\bT[O0]{2}L[S5]T[A4]T[I1][O0]N\b/i, /\bTOOLSTATION\b/i],
+    compactKeys: ["TOOLSTATION"],
+  },
+  {
+    id: "travis_perkins",
+    displayName: "Travis Perkins",
+    patterns: [/\bTR[A4]V[I1][S5]\s+P[E3]RK[I1]N[S5]\b/i, /\bTRAVIS PERKINS\b/i],
+    compactKeys: ["TRAVISPERKINS"],
+  },
 ];

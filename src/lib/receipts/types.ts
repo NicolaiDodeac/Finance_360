@@ -55,6 +55,10 @@ export type ReceiptTransactionKind =
 export interface CreateTransactionFromReceiptInput {
   purpose: ReceiptPurpose;
   payment_method?: ReceiptPaymentMethod | null;
+  /** Explicit category chosen by the user — overrides the detected one. */
+  category_choice_id?:
+    | import("@/lib/categorization/categorise-flow/types").CategoryChoiceId
+    | null;
   /** Skip creation (user chose "Skip for now"). */
   skip?: boolean;
   /** Record as income — only when user explicitly chooses. */
