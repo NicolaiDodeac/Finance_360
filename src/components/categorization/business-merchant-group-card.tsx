@@ -253,7 +253,7 @@ export function BusinessMerchantGroupCard({
       resolved.requiresBusinessUsePercent &&
       (businessUsePercent <= 0 || businessUsePercent > 100)
     ) {
-      setError("Enter a business use percentage between 1 and 100.");
+      setError("Enter how much was for business (1–100%).");
       return;
     }
 

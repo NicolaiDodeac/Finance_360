@@ -51,6 +51,28 @@ export default async function SettingsPage() {
             </Button>
           </CardContent>
         </Card>
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <CardTitle>Tools &amp; more</CardTitle>
+            <CardDescription>
+              Receipts, tax tools, and insights — all in one place.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" asChild>
+              <Link href="/receipts">Receipts</Link>
+            </Button>
+            <Button type="button" variant="outline" asChild>
+              <Link href="/insights">Insights</Link>
+            </Button>
+            <Button type="button" variant="outline" asChild>
+              <Link href="/tax">Tax Hub</Link>
+            </Button>
+            <Button type="button" variant="outline" asChild>
+              <Link href="/tax/self-assessment">Self Assessment</Link>
+            </Button>
+          </CardContent>
+        </Card>
         <Card>
           <CardHeader>
             <CardTitle>Profile</CardTitle>

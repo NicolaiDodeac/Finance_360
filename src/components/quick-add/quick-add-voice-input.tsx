@@ -11,6 +11,8 @@ interface QuickAddVoiceInputProps {
   onTextChange: (value: string) => void;
   disabled?: boolean;
   className?: string;
+  /** Begin listening as soon as the input mounts (e.g. opened from the voice action). */
+  autoStart?: boolean;
 }
 
 function VoiceWaveform({ active }: { active: boolean }) {
@@ -44,9 +46,11 @@ export function QuickAddVoiceInput({
   onTextChange,
   disabled,
   className,
+  autoStart,
 }: QuickAddVoiceInputProps) {
   const textPrefixRef = useRef("");
   const manualEditRef = useRef(false);
+  const autoStartedRef = useRef(false);
 
   const {
     isSupported,
@@ -61,6 +65,25 @@ export function QuickAddVoiceInput({
   } = useSpeechRecognition();
 
   useEffect(() => () => stopListening(), [stopListening]);
+
+  useEffect(() => {
+    if (!autoStart || autoStartedRef.current) return;
+    if (!isSupported || disabled || isListening) return;
+    autoStartedRef.current = true;
+    manualEditRef.current = false;
+    const trimmed = text.trim();
+    textPrefixRef.current = trimmed ? `${trimmed} ` : "";
+    resetTranscript();
+    startListening();
+  }, [
+    autoStart,
+    isSupported,
+    disabled,
+    isListening,
+    text,
+    resetTranscript,
+    startListening,
+  ]);
 
   useEffect(() => {
     if (!isListening || manualEditRef.current) return;

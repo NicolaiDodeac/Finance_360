@@ -118,18 +118,19 @@ export function TransactionsView({
         <div className="mb-4 flex flex-col gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="font-medium">
-              {uncategorisedCount} uncategorised transaction
-              {uncategorisedCount === 1 ? "" : "s"}
+              {uncategorisedCount} transaction
+              {uncategorisedCount === 1 ? "" : "s"} need
+              {uncategorisedCount === 1 ? "s" : ""} a category
             </p>
             <p className="text-sm text-muted-foreground">
-              Answer simple questions — we map categories and HMRC behind the
-              scenes.
+              Answer a few quick questions — we sort out the categories and tax
+              behind the scenes.
             </p>
           </div>
           <Button type="button" variant="secondary" asChild className="shrink-0">
             <Link href={CATEGORISE_ASSISTANT_PATH}>
               <Sparkles className="h-4 w-4" />
-              Business categorisation
+              Sort these out
             </Link>
           </Button>
         </div>

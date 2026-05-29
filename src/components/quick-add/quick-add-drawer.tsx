@@ -32,6 +32,8 @@ interface QuickAddDrawerProps {
   categories: CategoryRow[];
   hmrcCategories: HmrcCategoryRow[];
   dateContext?: QuickAddDateContext | null;
+  /** Start the microphone immediately when opened (voice quick-capture). */
+  autoStartVoice?: boolean;
 }
 
 type Step = "input" | "review";
@@ -63,6 +65,7 @@ export function QuickAddDrawer({
   categories,
   hmrcCategories,
   dateContext,
+  autoStartVoice,
 }: QuickAddDrawerProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -240,6 +243,7 @@ export function QuickAddDrawer({
                 text={text}
                 onTextChange={handleTextChange}
                 disabled={isPending}
+                autoStart={autoStartVoice && open}
               />
             </>
           ) : (

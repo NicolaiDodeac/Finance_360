@@ -3,6 +3,10 @@ import { ensureProfile } from "@/lib/profile/queries";
 import { getActiveSpaceContext, getUserSpaces } from "@/lib/spaces/queries";
 import { ensureUserSetup } from "@/lib/setup";
 import { AppShell } from "@/components/layout/app-shell";
+import { getCategories, type CategoryRow } from "@/lib/categories/queries";
+import { getHmrcCategories, type HmrcCategoryRow } from "@/lib/hmrc/queries";
+import { getTaxYears } from "@/lib/tax-years/queries";
+import { resolveDefaultTaxYear } from "@/lib/tax/tax-year";
 
 export default async function AppLayout({
   children,
@@ -23,12 +27,31 @@ export default async function AppLayout({
     getActiveSpaceContext(user.id),
   ]);
 
+  let captureCategories: CategoryRow[] = [];
+  let captureHmrcCategories: HmrcCategoryRow[] = [];
+  let captureDefaultTaxYearId: string | null = null;
+  try {
+    const [categories, hmrcCategories, taxYears] = await Promise.all([
+      getCategories(user.id),
+      getHmrcCategories(),
+      getTaxYears(user.id),
+    ]);
+    captureCategories = categories;
+    captureHmrcCategories = hmrcCategories;
+    captureDefaultTaxYearId = resolveDefaultTaxYear(taxYears)?.id ?? null;
+  } catch (err) {
+    console.error("[captureData]", err);
+  }
+
   return (
     <AppShell
       userEmail={user.email}
       financeMode={profile.finance_mode}
       spaces={spaces}
       activeSpaceId={activeSpace.id}
+      captureCategories={captureCategories}
+      captureHmrcCategories={captureHmrcCategories}
+      captureDefaultTaxYearId={captureDefaultTaxYearId}
     >
       {children}
     </AppShell>

@@ -116,7 +116,7 @@ export function RuleFormFields({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="rule-hmrc">HMRC category</Label>
+          <Label htmlFor="rule-hmrc">Tax category</Label>
           <Select
             id="rule-hmrc"
             value={value.hmrc_category_id ?? ""}

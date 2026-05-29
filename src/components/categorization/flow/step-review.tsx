@@ -158,7 +158,7 @@ export function StepReview({
         )}
         {resolved.requiresBusinessUsePercent && (
           <div className="space-y-2">
-            <dt className="font-medium text-foreground">Business use</dt>
+            <dt className="font-medium text-foreground">How much for business?</dt>
             <dd>
               <div className="flex items-center gap-3">
                 <input
@@ -182,7 +182,7 @@ export function StepReview({
         )}
         {showHmrcRow && (
           <div className="space-y-1">
-            <dt className="font-medium text-foreground">Tax category (HMRC)</dt>
+            <dt className="font-medium text-foreground">Tax category</dt>
             <dd className="flex flex-wrap items-center gap-2 text-muted-foreground">
               {displayHmrcName ? (
                 <span className="text-foreground">{displayHmrcName}</span>

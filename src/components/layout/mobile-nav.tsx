@@ -22,12 +22,17 @@ interface MobileNavProps {
   activeSpaceId?: string;
 }
 
+/** Routes already reachable from the mobile bottom tab bar (Home/Activity/Plans/You). */
+const BOTTOM_TAB_HREFS = new Set(["/dashboard", "/transactions", "/planning"]);
+
 export function MobileNav({
   financeMode = "personal",
   spaces = [],
   activeSpaceId,
 }: MobileNavProps) {
-  const navItems = getMainNavItems(financeMode);
+  const navItems = getMainNavItems(financeMode).filter(
+    (item) => !BOTTOM_TAB_HREFS.has(item.href)
+  );
   const [open, setOpen] = useState(false);
 
   return (
@@ -56,6 +61,9 @@ export function MobileNav({
           <MobileSpaceSwitcher spaces={spaces} activeSpaceId={activeSpaceId} />
         ) : null}
         <nav className="flex flex-col gap-1 p-4">
+          <p className="px-3 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            More
+          </p>
           {navItems.map((item) => (
             <NavLink
               key={item.href}

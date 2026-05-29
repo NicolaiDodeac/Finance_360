@@ -67,10 +67,10 @@ export function TransactionItem({
             <Badge variant="business">Business</Badge>
           )}
           {missingHmrc && (
-            <Badge variant="warning">HMRC needed</Badge>
+            <Badge variant="warning">Tax category</Badge>
           )}
           {uncategorized && (
-            <Badge variant="uncategorized">Uncategorized</Badge>
+            <Badge variant="uncategorized">Needs a category</Badge>
           )}
           {appliedRuleName && (
             <Badge variant="secondary" title="Category assigned by your rule">

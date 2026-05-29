@@ -122,7 +122,7 @@ export function TransactionFilters({
             >
               <option value="all">All directions</option>
               <option value="income">Income</option>
-              <option value="expense">Expense</option>
+              <option value="expense">Spending</option>
               <option value="transfer">Transfer</option>
             </Select>
           </FilterField>
@@ -152,7 +152,7 @@ export function TransactionFilters({
               }
             >
               <option value="">All categories</option>
-              <option value={UNCATEGORIZED_CATEGORY_FILTER}>Uncategorized</option>
+              <option value={UNCATEGORIZED_CATEGORY_FILTER}>Needs a category</option>
               {getSelectableCategories(categories).map((category) => (
                 <option key={category.id} value={category.id}>
                   {getCategoryOptionLabel(category, categories)}

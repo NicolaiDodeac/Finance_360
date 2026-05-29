@@ -51,8 +51,8 @@ export default async function CategoriseTransactionsPage() {
         </Button>
       </div>
       <PageHeader
-        title="Business categorisation assistant"
-        description="Income by type, expenses by purpose. Finance 360 maps categories and tax behind the scenes — you review before anything is saved."
+        title="What were these for?"
+        description="Answer a few quick questions about your income and spending. Finance 360 sorts out the categories and tax behind the scenes — you review before anything is saved."
       />
       <div className="mb-6">
         <CategorisationExplainerPanel />

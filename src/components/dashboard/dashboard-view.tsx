@@ -171,12 +171,12 @@ export function DashboardView({ data, taxYearId }: DashboardViewProps) {
           <MetricCard
             label="Top spending category"
             value={topCategoryDisplay}
-            hint="Largest personal expense category"
+            hint="Largest personal spending category"
           />
           <MetricCard
             label="Review recommended"
             value={String(personal.reviewRecommendedCount)}
-            hint="Uncategorized or flagged for a quick look"
+            hint="Needs a category or a quick look"
           />
         </div>
       </section>

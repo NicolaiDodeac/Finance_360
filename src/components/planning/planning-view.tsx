@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Compass, Users } from "lucide-react";
+import { Compass, Target, Users, Wallet } from "lucide-react";
 import { PlanningCreatePanel } from "@/components/planning/planning-create-panel";
 import { PlanningPlanCard } from "@/components/planning/planning-plan-card";
 import { PlanningSimpleGoalsSection } from "@/components/planning/planning-simple-goals-section";
@@ -37,6 +37,20 @@ export function PlanningView({
               mind. Small steps count; there is no rush and no judgment here.
             </p>
           </div>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button type="button" variant="outline" size="sm" asChild>
+            <Link href="/budget">
+              <Wallet className="h-4 w-4" />
+              Monthly budget
+            </Link>
+          </Button>
+          <Button type="button" variant="outline" size="sm" asChild>
+            <Link href="/goals">
+              <Target className="h-4 w-4" />
+              Savings goals
+            </Link>
+          </Button>
         </div>
       </div>
 

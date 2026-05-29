@@ -145,7 +145,7 @@ export function TransactionCategorisationReview({
       <div className="space-y-4">
         {form.is_business && !isIncome ? (
           <div className="space-y-2">
-            <Label htmlFor="tx-hmrc-adv">Tax category (HMRC)</Label>
+            <Label htmlFor="tx-hmrc-adv">Tax category</Label>
             <Select
               id="tx-hmrc-adv"
               value={form.hmrc_category_id ?? ""}
@@ -168,7 +168,7 @@ export function TransactionCategorisationReview({
         ) : null}
         {showMixedUse ? (
           <div className="space-y-2">
-            <Label htmlFor="tx-biz-pct-adv">Business use (%)</Label>
+            <Label htmlFor="tx-biz-pct-adv">How much was for business? (%)</Label>
             <input
               id="tx-biz-pct-adv"
               type="number"
