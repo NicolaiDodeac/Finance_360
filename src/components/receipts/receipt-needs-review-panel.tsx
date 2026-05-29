@@ -110,15 +110,26 @@ export function ReceiptNeedsReviewPanel({ receipt }: ReceiptNeedsReviewPanelProp
 
   const busy = isPending || isRetrying;
 
+  const missingFields = [
+    !formMerchant.trim() ? "merchant" : null,
+    !formDate.trim() ? "date" : null,
+    !formTotal.trim() ? "amount" : null,
+  ].filter(Boolean) as string[];
+
+  const checkMessage =
+    missingFields.length > 0
+      ? `Just add the ${missingFields.join(" and ")} below, then continue.`
+      : "Check the details below look right, then continue.";
+
   return (
     <div className="mx-auto max-w-lg space-y-5 pb-8">
       <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-4 py-3 text-center dark:border-amber-900/40 dark:bg-amber-950/30">
         <p className="font-medium text-amber-950 dark:text-amber-100">
-          Needs review
+          We need one quick check
         </p>
         <p className="mt-1 text-sm text-amber-900/90 dark:text-amber-200/90">
-          We could not read everything from this photo. Add details, or retry
-          scan (works best on a flat, well-lit photo).
+          Receipt saved as proof. {checkMessage} You can also retry the scan
+          (works best on a flat, well-lit photo).
         </p>
       </div>
 

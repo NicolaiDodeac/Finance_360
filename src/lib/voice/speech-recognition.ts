@@ -1,7 +1,5 @@
 import {
-  getSpeechLocaleForAppLanguage,
-  SPEECH_FALLBACK_LOCALE,
-  type AppLanguage,
+  SPEECH_RECOGNITION_LOCALE,
   type SpeechRecognitionLocale,
 } from "@/lib/i18n/app-language";
 
@@ -16,7 +14,6 @@ export type SpeechRecognitionErrorKind =
 export interface SpeechRecognitionHandle {
   recognition: SpeechRecognitionInstance;
   locale: SpeechRecognitionLocale;
-  usedFallback: boolean;
 }
 
 /** Minimal typings for the Web Speech API (not in all TS DOM libs). */
@@ -88,9 +85,7 @@ function getSpeechRecognitionConstructor(): SpeechRecognitionConstructor | null 
   return window.SpeechRecognition ?? window.webkitSpeechRecognition ?? null;
 }
 
-export function createSpeechRecognition(
-  locale: SpeechRecognitionLocale
-): SpeechRecognitionHandle | null {
+export function createSpeechRecognition(): SpeechRecognitionHandle | null {
   const Ctor = getSpeechRecognitionConstructor();
   if (!Ctor) return null;
 
@@ -98,26 +93,11 @@ export function createSpeechRecognition(
   recognition.continuous = true;
   recognition.interimResults = true;
   recognition.maxAlternatives = 1;
-  recognition.lang = locale;
+  recognition.lang = SPEECH_RECOGNITION_LOCALE;
 
   return {
     recognition,
-    locale,
-    usedFallback: locale === SPEECH_FALLBACK_LOCALE,
-  };
-}
-
-export function createSpeechRecognitionForAppLanguage(
-  language: AppLanguage,
-  options?: { preferFallback?: boolean }
-): SpeechRecognitionHandle | null {
-  const primary = getSpeechLocaleForAppLanguage(language);
-  const locale = options?.preferFallback ? SPEECH_FALLBACK_LOCALE : primary;
-  const handle = createSpeechRecognition(locale);
-  if (!handle) return null;
-  return {
-    ...handle,
-    usedFallback: Boolean(options?.preferFallback && language === "uk"),
+    locale: SPEECH_RECOGNITION_LOCALE,
   };
 }
 
@@ -158,8 +138,50 @@ export function unsupportedSpeechMessage(): string {
   return "Voice input is not supported on this device/browser.";
 }
 
-export function ukrainianFallbackNotice(): string {
-  return "Ukrainian voice is not available here — listening in English.";
+/**
+ * Common merchant / brand names spoken aloud are often transcribed with
+ * spelling variants, spacing, or as ordinary words by the en-GB recogniser.
+ * These corrections normalise them back to their canonical form so voice
+ * capture stays consistent (e.g. "canvas" → "Canva", "h m r c" → "HMRC").
+ *
+ * Keys are matched case-insensitively against whole words.
+ */
+const MERCHANT_SPEECH_CORRECTIONS: Record<string, string> = {
+  tesco: "Tesco",
+  tescos: "Tesco",
+  "tesco's": "Tesco",
+  shell: "Shell",
+  uber: "Uber",
+  cursor: "Cursor",
+  canva: "Canva",
+  canvas: "Canva",
+  booksy: "Booksy",
+  "book see": "Booksy",
+  bookcy: "Booksy",
+  lloyds: "Lloyds",
+  "lloyd's": "Lloyds",
+  lloyd: "Lloyds",
+  hmrc: "HMRC",
+  "h m r c": "HMRC",
+};
+
+const MERCHANT_CORRECTION_PATTERNS = Object.entries(
+  MERCHANT_SPEECH_CORRECTIONS
+).map(([phrase, canonical]) => ({
+  canonical,
+  regex: new RegExp(
+    `\\b${phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`,
+    "gi"
+  ),
+}));
+
+/** Normalise spoken merchant names to their canonical spelling. */
+export function normaliseMerchantSpeech(transcript: string): string {
+  let result = transcript;
+  for (const { regex, canonical } of MERCHANT_CORRECTION_PATTERNS) {
+    result = result.replace(regex, canonical);
+  }
+  return result;
 }
 
 /** Optional short haptic on supported mobile browsers. */

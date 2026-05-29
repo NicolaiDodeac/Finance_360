@@ -203,7 +203,7 @@ function pickCategory(
 
   for (const tx of txs) {
     const key = tx.category_id ?? "__uncategorized__";
-    const name = tx.category?.name ?? "Uncategorized";
+    const name = tx.category?.name ?? "Needs a category";
     const existing = counts.get(key);
     if (existing) {
       existing.count += 1;

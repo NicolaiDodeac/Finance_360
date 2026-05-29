@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, PiggyBank, Upload } from "lucide-react";
+import { ArrowRight, CalendarRange, PiggyBank, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -8,12 +8,28 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { EmptyState } from "@/components/shared/empty-state";
 
 export function DashboardMonthEmptyState({ monthLabel }: { monthLabel: string }) {
   return (
-    <p className="rounded-lg border border-dashed px-4 py-3 text-center text-sm text-muted-foreground">
-      No activity recorded for {monthLabel} yet.
-    </p>
+    <EmptyState
+      icon={<CalendarRange />}
+      title={`Nothing recorded for ${monthLabel} yet`}
+      description="Import a statement or add a transaction to see this month come alive."
+      action={
+        <Button type="button" asChild>
+          <Link href="/transactions/import">
+            <Upload className="h-4 w-4" />
+            Import statement
+          </Link>
+        </Button>
+      }
+      secondaryAction={
+        <Button type="button" variant="outline" asChild>
+          <Link href="/transactions">Add a transaction</Link>
+        </Button>
+      }
+    />
   );
 }
 
@@ -31,7 +47,7 @@ export function DashboardEmptyState() {
         <Button type="button" asChild>
           <Link href="/transactions/import">
             <Upload className="mr-2 h-4 w-4" />
-            Import bank statement
+            Import statement
           </Link>
         </Button>
         <Button type="button" variant="outline" asChild>

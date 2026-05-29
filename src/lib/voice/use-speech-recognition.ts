@@ -1,16 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useAppLanguage } from "@/components/providers/app-language-provider";
 import {
-  createSpeechRecognitionForAppLanguage,
+  createSpeechRecognition,
   isSpeechRecognitionSupported,
   mapSpeechRecognitionError,
+  normaliseMerchantSpeech,
   SPEECH_SILENCE_AUTO_STOP_MS,
   type SpeechRecognitionInstance,
   type SpeechRecognitionResultEvent,
   unsupportedSpeechMessage,
-  ukrainianFallbackNotice,
   vibrateSpeechFeedback,
 } from "@/lib/voice/speech-recognition";
 
@@ -20,21 +19,16 @@ export interface UseSpeechRecognitionResult {
   transcript: string;
   interimTranscript: string;
   error: string | null;
-  languageFallbackNotice: string | null;
   startListening: () => void;
   stopListening: () => void;
   resetTranscript: () => void;
 }
 
 export function useSpeechRecognition(): UseSpeechRecognitionResult {
-  const { language } = useAppLanguage();
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [interimTranscript, setInterimTranscript] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [languageFallbackNotice, setLanguageFallbackNotice] = useState<
-    string | null
-  >(null);
 
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -78,17 +72,11 @@ export function useSpeechRecognition(): UseSpeechRecognitionResult {
   }, []);
 
   const beginRecognition = useCallback(
-    (preferFallback: boolean) => {
-      const handle = createSpeechRecognitionForAppLanguage(language, {
-        preferFallback,
-      });
+    () => {
+      const handle = createSpeechRecognition();
       if (!handle) {
         setError(unsupportedSpeechMessage());
         return false;
-      }
-
-      if (handle.usedFallback) {
-        setLanguageFallbackNotice(ukrainianFallbackNotice());
       }
 
       const scheduleSilenceStop = () => {
@@ -112,7 +100,7 @@ export function useSpeechRecognition(): UseSpeechRecognitionResult {
           const text = result[0]?.transcript?.trim() ?? "";
           if (!text) continue;
           if (result.isFinal) {
-            finals += (finals ? " " : "") + text;
+            finals += (finals ? " " : "") + normaliseMerchantSpeech(text);
           } else {
             interim += (interim ? " " : "") + text;
           }
@@ -153,7 +141,7 @@ export function useSpeechRecognition(): UseSpeechRecognitionResult {
         return false;
       }
     },
-    [clearSilenceTimer, language, stopListening]
+    [clearSilenceTimer, stopListening]
   );
 
   const startListening = useCallback(() => {
@@ -163,24 +151,14 @@ export function useSpeechRecognition(): UseSpeechRecognitionResult {
     }
 
     stopListening();
-    setLanguageFallbackNotice(null);
     setError(null);
 
-    const started = beginRecognition(false);
+    const started = beginRecognition();
     if (started) return;
-
-    if (language === "uk") {
-      const fallbackStarted = beginRecognition(true);
-      if (fallbackStarted) return;
-    }
 
     setError("Could not start voice input. Tap the microphone to try again.");
     setIsListening(false);
-  }, [beginRecognition, isSupported, language, stopListening]);
-
-  useEffect(() => {
-    if (isListening) stopListening();
-  }, [language]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [beginRecognition, isSupported, stopListening]);
 
   useEffect(() => () => stopListening(), [stopListening]);
 
@@ -190,7 +168,6 @@ export function useSpeechRecognition(): UseSpeechRecognitionResult {
     transcript,
     interimTranscript,
     error,
-    languageFallbackNotice,
     startListening,
     stopListening,
     resetTranscript,

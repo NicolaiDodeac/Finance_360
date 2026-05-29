@@ -171,12 +171,12 @@ export function DashboardView({ data, taxYearId }: DashboardViewProps) {
           <MetricCard
             label="Top spending category"
             value={topCategoryDisplay}
-            hint="Largest personal expense category"
+            hint="Largest personal spending category"
           />
           <MetricCard
             label="Review recommended"
             value={String(personal.reviewRecommendedCount)}
-            hint="Uncategorized or flagged for a quick look"
+            hint="Needs a category or a quick look"
           />
         </div>
       </section>
@@ -307,7 +307,7 @@ export function DashboardView({ data, taxYearId }: DashboardViewProps) {
           <CardHeader>
             <CardTitle className="text-base">Recurring payments</CardTitle>
             <CardDescription>
-              Regular personal expenses detected from your transactions
+              Regular personal spending detected from your transactions
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

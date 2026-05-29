@@ -49,7 +49,7 @@ export function TransactionReceiptSection({
   if (!isBusinessExpense) {
     return (
       <p className="text-sm text-muted-foreground">
-        Mark as a business expense to attach proof.
+        Mark as a business cost to attach proof.
       </p>
     );
   }

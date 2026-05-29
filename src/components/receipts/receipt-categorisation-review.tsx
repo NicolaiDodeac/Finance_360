@@ -93,7 +93,7 @@ export function ReceiptCategorisationReview({
     <UniversalCategorisationReview
       context={context}
       onConfirm={onConfirm}
-      confirmLabel={isPending ? "Saving…" : "Confirm"}
+      confirmLabel={isPending ? "Saving…" : "Create from receipt"}
       disabled={disabled}
       isPending={isPending}
       changePanel={purposePanel}

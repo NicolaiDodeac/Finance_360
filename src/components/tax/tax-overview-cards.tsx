@@ -37,9 +37,9 @@ export function TaxOverviewCards({ metrics }: TaxOverviewCardsProps) {
       hint: "Business transactions where additional proof may help",
     },
     {
-      label: "Uncategorized business expenses",
+      label: "Business expenses needing a category",
       value: String(metrics.uncategorizedBusinessExpensesCount),
-      hint: "No HMRC category assigned yet",
+      hint: "No tax category assigned yet",
     },
     {
       label: "Suggested tax pot",

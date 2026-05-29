@@ -229,7 +229,7 @@ export function ReceiptDetailDrawer({
                     Linked to transaction
                   </p>
                   <p className="mt-1 text-sm text-emerald-800/90 dark:text-emerald-300/90">
-                    {attached.merchant_name ?? attached.description ?? "Expense"}{" "}
+                    {attached.merchant_name ?? attached.description ?? "Spending"}{" "}
                     · {formatMoney(Number(attached.amount))} ·{" "}
                     {formatTransactionDate(attached.transaction_date)}
                   </p>

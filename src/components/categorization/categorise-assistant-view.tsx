@@ -229,7 +229,7 @@ export function CategoriseAssistantView({
           {expenseGroups.length > 0 && (
             <section className="space-y-4">
               <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-                Expenses
+                Spending
               </h2>
               {expenseGroups.map((group) => (
                 <BusinessMerchantGroupCard

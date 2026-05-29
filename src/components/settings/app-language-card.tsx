@@ -23,7 +23,8 @@ export function AppLanguageCard() {
       <CardHeader>
         <CardTitle>App language</CardTitle>
         <CardDescription>
-          Affects voice input in Quick Add. More translations coming later.
+          Sets the app display language. Voice input always uses English (UK).
+          More translations coming later.
         </CardDescription>
       </CardHeader>
       <CardContent>

@@ -48,6 +48,8 @@ export default function SelfAssessmentPage({
   return (
     <>
       <PageHeader
+        backHref="/tax"
+        backLabel="Back to Tax Hub"
         title="Self Assessment prep"
         description="A step-by-step assistant to prepare your self-employment figures before you enter them into HMRC."
       />

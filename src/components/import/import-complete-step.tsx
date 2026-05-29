@@ -36,7 +36,7 @@ export function ImportCompleteStep({
         {result.imported > 0 && (
           <Button type="button" variant="secondary" asChild>
             <Link href={CATEGORISE_ASSISTANT_PATH}>
-              Categorise imported transactions
+              Sort imported transactions
             </Link>
           </Button>
         )}

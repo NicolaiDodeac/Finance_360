@@ -1,24 +1,36 @@
 import { extractMerchantFromReceiptText } from "@/lib/receipts/ocr/extract-merchant";
 import { parseMoneyAmount } from "@/lib/receipts/ocr/parse-amount";
+import {
+  resolveReviewLevel,
+  scoreFieldConfidence,
+} from "@/lib/receipts/ocr/confidence";
 import type { ReceiptPaymentMethod } from "@/types/database";
 import type { ReceiptOcrExtraction } from "@/lib/receipts/ocr/types";
 
-/** Final total line — not subtotal/savings (Tesco prints both). */
-const TOTAL_LABELS = [
-  /(?:^|\n)\s*total\s*[:\s]*[£$]?\s*([\d.,]+)/im,
-  /(?:^|\n)\s*(?:amount\s+due|grand\s+total|balance\s+due|you\s+paid)\s*[:\s]*[£$]?\s*([\d.,]+)/im,
-  /(?:^|\n)\s*card\s*[:\s]*[£$]?\s*([\d.,]+)/im,
+/**
+ * Final-total label lines, in priority order. Subtotal/savings are handled
+ * separately so we never mistake them for the amount actually paid.
+ */
+const TOTAL_LABELS: RegExp[] = [
+  /(?:^|\n)\s*(?:grand\s+total|total\s+to\s+pay|amount\s+due|balance\s+due|you\s+paid|total\s+paid)\s*[:\s]*[£$€]?\s*([\d.,]+)/im,
+  /(?:^|\n)\s*total\s*[:\s]*[£$€]?\s*([\d.,]+)/im,
+  /(?:^|\n)\s*(?:card|contactless|paid|sale|purchase|debit|credit)\s*[:\s]*[£$€]?\s*([\d.,]+)/im,
 ];
 
+/** Lines whose amounts must never be treated as the receipt total. */
+const TOTAL_EXCLUSION =
+  /\b(vat|v\.a\.t\.?|tax|change|cash\s*back|cashback|tendered|tender|round(?:ing)?|points?|balance\s+remaining|savings?)\b/i;
+
 const VAT_LABELS =
-  /(?:vat|v\.a\.t\.?)\s*(?:@?\s*\d+%?)?\s*[:\s]*[£$]?\s*([\d.,]+)/im;
+  /(?:vat|v\.a\.t\.?|gb\s*vat|vat\s*reg)\s*(?:no\.?|number|reg\.?)?\s*(?:@?\s*\d+%?)?\s*[:\s]*[£$€]?\s*([\d.,]+)/im;
 
 const CURRENCY_AMOUNT =
-  /[£$]\s*([\d,]+[.,]\d{1,2})\b|[£$]\s*([\d,]+\.\d{2})\b|(?:^|\s)([\d,]+[.,]\d{1,2})(?:\s|$)/g;
+  /[£$€]\s*([\d,]+[.,]\d{1,2})\b|[£$€]\s*([\d,]+\.\d{2})\b|(?:^|\s)([\d,]+[.,]\d{1,2})(?:\s|$)/g;
 
 const UK_DATE_PATTERNS = [
   /\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})\b/g,
   /\b(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+(\d{2,4})\b/gi,
+  /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+(\d{1,2}),?\s+(\d{2,4})\b/gi,
   /\b(\d{4})-(\d{2})-(\d{2})\b/g,
 ];
 
@@ -26,11 +38,12 @@ const PAYMENT_PATTERNS: Array<{
   method: ReceiptPaymentMethod;
   pattern: RegExp;
 }> = [
-  { method: "contactless", pattern: /\bcontactless\b/i },
-  { method: "cash", pattern: /\b(cash|paid\s+in\s+cash)\b/i },
+  { method: "contactless", pattern: /\b(contactless|tap\s*(?:to\s*pay)?|apple\s*pay|google\s*pay)\b/i },
+  { method: "cash", pattern: /\b(cash|paid\s+in\s+cash|cash\s+tendered)\b/i },
   {
     method: "card",
-    pattern: /\b(card|debit|credit|visa|mastercard|amex|chip\s*&\s*pin)\b/i,
+    pattern:
+      /\b(card|debit|credit|visa|mastercard|maestro|amex|american\s+express|chip\s*&?\s*pin|chip\s+and\s+pin)\b/i,
   },
 ];
 
@@ -42,6 +55,21 @@ function toIsoDate(day: number, month: number, year: number): string | null {
   if (Number.isNaN(parsed.getTime())) return null;
   return iso;
 }
+
+const MONTH_NAMES = [
+  "jan",
+  "feb",
+  "mar",
+  "apr",
+  "may",
+  "jun",
+  "jul",
+  "aug",
+  "sep",
+  "oct",
+  "nov",
+  "dec",
+];
 
 function extractDate(text: string): string | null {
   const withTime =
@@ -60,81 +88,106 @@ function extractDate(text: string): string | null {
     pattern.lastIndex = 0;
     let match: RegExpExecArray | null;
     while ((match = pattern.exec(text)) !== null) {
-      if (match[0].includes("-") && match.length >= 4) {
+      if (match[0].includes("-") && /^\d{4}-\d{2}-\d{2}$/.test(match[0])) {
         const iso = `${match[1]}-${match[2]}-${match[3]}`;
         if (!Number.isNaN(new Date(`${iso}T12:00:00`).getTime())) {
           return iso;
         }
+        continue;
       }
-      const monthNames = [
-        "jan",
-        "feb",
-        "mar",
-        "apr",
-        "may",
-        "jun",
-        "jul",
-        "aug",
-        "sep",
-        "oct",
-        "nov",
-        "dec",
-      ];
-      const monthStr = match[2]?.toString().toLowerCase().slice(0, 3);
-      const monthIndex = monthNames.indexOf(monthStr ?? "");
-      if (monthIndex >= 0) {
+
+      // "12 May 2026" — month name in slot 2.
+      const monthInTwo = MONTH_NAMES.indexOf(
+        match[2]?.toString().toLowerCase().slice(0, 3) ?? ""
+      );
+      if (monthInTwo >= 0) {
         const day = Number(match[1]);
         let year = Number(match[3]);
         if (year < 100) year += 2000;
-        const iso = toIsoDate(day, monthIndex + 1, year);
+        const iso = toIsoDate(day, monthInTwo + 1, year);
         if (iso) return iso;
-      } else {
-        let d = Number(match[1]);
-        let m = Number(match[2]);
-        let y = Number(match[3]);
-        if (y < 100) y += 2000;
-        if (m > 12 && d <= 12) {
-          [d, m] = [m, d];
-        }
-        const iso = toIsoDate(d, m, y);
-        if (iso) return iso;
+        continue;
       }
+
+      // "May 12, 2026" — month name in slot 1.
+      const monthInOne = MONTH_NAMES.indexOf(
+        match[1]?.toString().toLowerCase().slice(0, 3) ?? ""
+      );
+      if (monthInOne >= 0) {
+        const day = Number(match[2]);
+        let year = Number(match[3]);
+        if (year < 100) year += 2000;
+        const iso = toIsoDate(day, monthInOne + 1, year);
+        if (iso) return iso;
+        continue;
+      }
+
+      // Numeric d/m/y (UK-first, with disambiguation).
+      let d = Number(match[1]);
+      let m = Number(match[2]);
+      let y = Number(match[3]);
+      if (y < 100) y += 2000;
+      if (m > 12 && d <= 12) {
+        [d, m] = [m, d];
+      }
+      const iso = toIsoDate(d, m, y);
+      if (iso) return iso;
     }
   }
   return null;
 }
 
-function extractTotal(text: string): number | null {
+interface TotalResult {
+  amount: number | null;
+  source: "keyword" | "largest" | "none";
+}
+
+function extractTotal(text: string): TotalResult {
+  // 1. Keyword lines (most reliable), skipping VAT/change/cashback lines.
+  const lines = text.split(/\n/);
   for (const pattern of TOTAL_LABELS) {
-    const labelMatch = text.match(pattern);
-    if (labelMatch?.[1]) {
-      const parsed = parseMoneyAmount(labelMatch[1]);
-      if (parsed !== null) return parsed;
+    for (const line of lines) {
+      if (TOTAL_EXCLUSION.test(line)) continue;
+      pattern.lastIndex = 0;
+      const labelMatch = pattern.exec(`\n${line}`);
+      if (labelMatch?.[1]) {
+        const parsed = parseMoneyAmount(labelMatch[1]);
+        if (parsed !== null && parsed > 0) {
+          return { amount: parsed, source: "keyword" };
+        }
+      }
     }
   }
 
+  // 2. Largest plausible amount, biased to amounts at/below any subtotal,
+  //    ignoring VAT/change/cashback lines.
   const amounts: number[] = [];
-  let match: RegExpExecArray | null;
-  const re = new RegExp(CURRENCY_AMOUNT.source, CURRENCY_AMOUNT.flags);
-  while ((match = re.exec(text)) !== null) {
-    const raw = match[1] ?? match[2] ?? match[3];
-    if (!raw) continue;
-    const parsed = parseMoneyAmount(raw);
-    if (parsed !== null) amounts.push(parsed);
+  for (const line of lines) {
+    if (TOTAL_EXCLUSION.test(line)) continue;
+    const re = new RegExp(CURRENCY_AMOUNT.source, CURRENCY_AMOUNT.flags);
+    let match: RegExpExecArray | null;
+    while ((match = re.exec(line)) !== null) {
+      const raw = match[1] ?? match[2] ?? match[3];
+      if (!raw) continue;
+      const parsed = parseMoneyAmount(raw);
+      if (parsed !== null && parsed > 0) amounts.push(parsed);
+    }
   }
 
-  if (amounts.length === 0) return null;
+  if (amounts.length === 0) return { amount: null, source: "none" };
 
-  const subtotalMatch = /subtotal\s*[:\s]*[£$]?\s*([\d.,]+)/i.exec(text);
+  const subtotalMatch = /subtotal\s*[:\s]*[£$€]?\s*([\d.,]+)/i.exec(text);
   if (subtotalMatch?.[1]) {
     const subtotal = parseMoneyAmount(subtotalMatch[1]);
-    const belowSubtotal = amounts.filter((a) => subtotal === null || a <= subtotal);
+    const belowSubtotal = amounts.filter(
+      (a) => subtotal === null || a <= subtotal
+    );
     if (belowSubtotal.length > 0) {
-      return Math.max(...belowSubtotal);
+      return { amount: Math.max(...belowSubtotal), source: "largest" };
     }
   }
 
-  return Math.max(...amounts);
+  return { amount: Math.max(...amounts), source: "largest" };
 }
 
 function extractVat(text: string): number | null {
@@ -152,21 +205,20 @@ function extractPaymentMethod(text: string): ReceiptPaymentMethod | null {
   return null;
 }
 
-function buildConfidence(
-  extraction: Omit<ReceiptOcrExtraction, "confidence" | "fieldsFound">
-): Pick<ReceiptOcrExtraction, "confidence" | "fieldsFound"> {
+function legacyFieldList(extraction: {
+  merchant: string | null;
+  receiptDate: string | null;
+  totalAmount: number | null;
+  vatAmount: number | null;
+  paymentMethod: ReceiptPaymentMethod | null;
+}): string[] {
   const fieldsFound: string[] = [];
   if (extraction.merchant) fieldsFound.push("merchant");
   if (extraction.receiptDate) fieldsFound.push("date");
   if (extraction.totalAmount !== null) fieldsFound.push("total");
   if (extraction.vatAmount !== null) fieldsFound.push("vat");
   if (extraction.paymentMethod) fieldsFound.push("payment");
-
-  let confidence: ReceiptOcrExtraction["confidence"] = "low";
-  if (fieldsFound.length >= 3) confidence = "high";
-  else if (fieldsFound.length >= 1) confidence = "medium";
-
-  return { confidence, fieldsFound };
+  return fieldsFound;
 }
 
 /** Parse plain text from a receipt PDF or OCR output. */
@@ -178,29 +230,72 @@ export function parseReceiptText(text: string): ReceiptOcrExtraction {
       merchantSource: "unknown",
       knownMerchantId: null,
       receiptDate: null,
+      dateIsFallback: false,
       totalAmount: null,
       vatAmount: null,
       paymentMethod: null,
       rawText: null,
       confidence: "low",
       fieldsFound: [],
+      fieldConfidence: {
+        merchant: "low",
+        date: "low",
+        total: "low",
+        payment: "low",
+        vat: "low",
+      },
+      reviewLevel: "needs_review",
     };
   }
 
   const merchantResult = extractMerchantFromReceiptText(normalized);
+  const totalResult = extractTotal(normalized);
+  const receiptDate = extractDate(normalized);
+  const vatAmount = extractVat(normalized);
+  const paymentMethod = extractPaymentMethod(normalized);
 
   const base = {
     merchant: merchantResult.merchant,
     merchantSource: merchantResult.source,
     knownMerchantId: merchantResult.knownMerchantId,
-    receiptDate: extractDate(normalized),
-    totalAmount: extractTotal(normalized),
-    vatAmount: extractVat(normalized),
-    paymentMethod: extractPaymentMethod(normalized),
+    receiptDate,
+    dateIsFallback: false,
+    totalAmount: totalResult.amount,
+    vatAmount,
+    paymentMethod,
     rawText: normalized.slice(0, 8000),
   };
 
-  const { confidence, fieldsFound } = buildConfidence(base);
+  const fieldConfidence = scoreFieldConfidence({
+    merchant: base.merchant,
+    merchantSource: base.merchantSource,
+    receiptDate: base.receiptDate,
+    dateIsFallback: base.dateIsFallback,
+    totalAmount: base.totalAmount,
+    totalSource: totalResult.source,
+    paymentMethod: base.paymentMethod,
+    vatAmount: base.vatAmount,
+  });
 
-  return { ...base, confidence, fieldsFound };
+  const reviewLevel = resolveReviewLevel(fieldConfidence, {
+    merchant: base.merchant,
+    receiptDate: base.receiptDate,
+    totalAmount: base.totalAmount,
+    dateIsFallback: base.dateIsFallback,
+  });
+
+  const confidence =
+    reviewLevel === "high"
+      ? "high"
+      : reviewLevel === "medium"
+        ? "medium"
+        : "low";
+
+  return {
+    ...base,
+    fieldsFound: legacyFieldList(base),
+    fieldConfidence,
+    reviewLevel,
+    confidence,
+  };
 }

@@ -147,7 +147,7 @@ export function TransactionCategoryFields({
 
           {form.is_business ? (
             <div className="space-y-2 rounded-lg border border-border/80 bg-muted/20 p-3">
-              <Label htmlFor={`${idPrefix}-hmrc`}>Tax category (HMRC)</Label>
+              <Label htmlFor={`${idPrefix}-hmrc`}>Tax category</Label>
               <p className="text-xs text-muted-foreground">
                 Used on your tax return — we suggest one when you pick a business
                 category.
@@ -175,7 +175,9 @@ export function TransactionCategoryFields({
 
           {showMixedUse ? (
             <div className="space-y-2">
-              <Label htmlFor={`${idPrefix}-biz-pct`}>Business use (%)</Label>
+              <Label htmlFor={`${idPrefix}-biz-pct`}>
+                How much was for business? (%)
+              </Label>
               <input
                 id={`${idPrefix}-biz-pct`}
                 type="number"
@@ -222,7 +224,7 @@ export function TransactionCategoryFields({
           </div>
           {form.is_business ? (
             <div className="space-y-2 rounded-lg border border-border/80 bg-muted/20 p-3">
-              <Label htmlFor={`${idPrefix}-hmrc-income`}>Tax category (HMRC)</Label>
+              <Label htmlFor={`${idPrefix}-hmrc-income`}>Tax category</Label>
               <Select
                 id={`${idPrefix}-hmrc-income`}
                 value={form.hmrc_category_id ?? ""}

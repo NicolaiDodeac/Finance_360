@@ -143,7 +143,8 @@ export function ReceiptsVaultView({
         <CardContent className="space-y-2">
           {receipts.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Nothing stored yet. Upload your first receipt above.
+              Nothing stored yet. Capture a receipt above and we&apos;ll read the
+              details for you.
             </p>
           ) : (
             receipts.map((receipt) => (

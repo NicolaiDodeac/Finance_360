@@ -43,14 +43,14 @@ export function ReceiptCaptureReviewGate({
         const result = await runReceiptCaptureOcr(review.receipt.id);
         if (cancelled) return;
         if (!result.success) {
-          setScanError(result.error ?? "Could not read this receipt.");
+          setScanError(result.error ?? "We couldn't read this receipt.");
           return;
         }
         router.refresh();
-      } catch (err) {
+      } catch {
         if (!cancelled) {
           setScanError(
-            err instanceof Error ? err.message : "Could not scan receipt."
+            "We couldn't read this photo. Add the details manually or try again."
           );
         }
       }
@@ -67,13 +67,13 @@ export function ReceiptCaptureReviewGate({
       try {
         const result = await runReceiptCaptureOcr(review.receipt.id);
         if (!result.success) {
-          setScanError(result.error ?? "Could not read this receipt.");
+          setScanError(result.error ?? "We couldn't read this receipt.");
           return;
         }
         router.refresh();
-      } catch (err) {
+      } catch {
         setScanError(
-          err instanceof Error ? err.message : "Could not scan receipt."
+          "We couldn't read this photo. Add the details manually or try again."
         );
       }
     });

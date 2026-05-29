@@ -4,6 +4,8 @@ import {
   detectKnownMerchant,
   extractMerchantFromReceiptText,
 } from "../src/lib/receipts/ocr/extract-merchant";
+import { classifyReceiptText } from "../src/lib/receipts/classify";
+import { RECEIPT_FIXTURES } from "../src/lib/receipts/ocr/__fixtures__/receipt-fixtures";
 
 /** Simulates wrinkled-receipt OCR: garbage header line + real Tesco token. */
 const TESCO_WRINKLED_OCR = `
@@ -83,4 +85,73 @@ assert(
 assert(parseMoneyAmount("16,40") === 16.4, "comma decimal");
 assert(parseMoneyAmount("£16.40") === 16.4, "pound amount");
 
-console.log("Receipt OCR assertions passed.");
+// Multi-type fixtures: groceries, fuel, cafe, pharmacy, beauty, cash, card, noisy.
+for (const fixture of RECEIPT_FIXTURES) {
+  const parsed = parseReceiptText(fixture.text);
+  const { expect } = fixture;
+  const where = `[${fixture.id}]`;
+
+  if (expect.merchant !== undefined) {
+    assert(
+      parsed.merchant === expect.merchant,
+      `${where} merchant: expected ${expect.merchant}, got ${parsed.merchant}`
+    );
+  }
+  if (expect.knownMerchantId !== undefined) {
+    assert(
+      parsed.knownMerchantId === expect.knownMerchantId,
+      `${where} knownMerchantId: expected ${expect.knownMerchantId}, got ${parsed.knownMerchantId}`
+    );
+  }
+  if (expect.totalAmount !== undefined) {
+    assert(
+      parsed.totalAmount === expect.totalAmount,
+      `${where} total: expected ${expect.totalAmount}, got ${parsed.totalAmount}`
+    );
+  }
+  if (expect.receiptDate !== undefined) {
+    assert(
+      parsed.receiptDate === expect.receiptDate,
+      `${where} date: expected ${expect.receiptDate}, got ${parsed.receiptDate}`
+    );
+  }
+  if (expect.paymentMethod !== undefined) {
+    assert(
+      parsed.paymentMethod === expect.paymentMethod,
+      `${where} payment: expected ${expect.paymentMethod}, got ${parsed.paymentMethod}`
+    );
+  }
+  if (expect.vatAmount !== undefined) {
+    assert(
+      parsed.vatAmount === expect.vatAmount,
+      `${where} vat: expected ${expect.vatAmount}, got ${parsed.vatAmount}`
+    );
+  }
+  if (expect.reviewLevel !== undefined) {
+    assert(
+      parsed.reviewLevel === expect.reviewLevel,
+      `${where} reviewLevel: expected ${expect.reviewLevel}, got ${parsed.reviewLevel}`
+    );
+  }
+  if (expect.classificationPattern !== undefined) {
+    const classification = classifyReceiptText(parsed.merchant, parsed.rawText);
+    assert(
+      classification.patternId === expect.classificationPattern,
+      `${where} classification: expected ${expect.classificationPattern}, got ${classification.patternId}`
+    );
+  }
+}
+
+// Original receipt text must always be preserved for audit, even for noisy scans.
+const noisy = RECEIPT_FIXTURES.find((f) => f.id === "bad_noisy");
+if (noisy) {
+  const parsed = parseReceiptText(noisy.text);
+  assert(
+    parsed.rawText !== null && parsed.rawText.includes("SHA ENE RUHR"),
+    "noisy receipt: raw text must be preserved for evidence"
+  );
+}
+
+console.log(
+  `Receipt OCR assertions passed (${RECEIPT_FIXTURES.length} fixtures).`
+);

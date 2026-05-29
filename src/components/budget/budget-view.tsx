@@ -68,22 +68,6 @@ export function BudgetView({ data, expenseCategories, allCategories }: BudgetVie
   if (!budget) {
     return (
       <div className="space-y-6">
-        <Card className="border-dashed">
-          <CardHeader>
-            <CardTitle className="text-base">Monthly plan</CardTitle>
-            <CardDescription>
-              No monthly plan for {period.label} yet.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/goals">
-                <PiggyBank className="mr-2 h-4 w-4" />
-                View savings goals
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
         {canManage ? (
           <BudgetCreatePlanForm
             period={period}

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { Plus, Users } from "lucide-react";
 import { GoalCard } from "@/components/goals/goal-card";
 import { PlaceholderCard } from "@/components/shared/placeholder-card";
@@ -106,19 +105,10 @@ export function GoalsView({
           title={isShared ? "No shared goals yet" : "No active goals yet"}
           description={
             canManage
-              ? "Create your first goal above, or start from the dashboard."
+              ? "Create your first goal using the form above."
               : "Goals will appear here when an admin adds them."
           }
-        >
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/planning">Open Planning Hub</Link>
-            </Button>
-            <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/dashboard">Back to dashboard</Link>
-            </Button>
-          </div>
-        </PlaceholderCard>
+        />
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {active.map((goal) => (

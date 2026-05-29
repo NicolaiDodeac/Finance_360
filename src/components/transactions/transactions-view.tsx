@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Plus, Sparkles, Upload } from "lucide-react";
-import { QuickAddButton } from "@/components/quick-add/quick-add-button";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { TransactionCreateDrawer } from "@/components/transactions/transaction-create-drawer";
@@ -22,8 +21,6 @@ import {
   toEvidenceInput,
 } from "@/lib/evidence";
 import { CATEGORISE_ASSISTANT_PATH } from "@/lib/transactions/links";
-import { buildQuickAddDateContextFromFilter } from "@/lib/quick-add/date-context";
-import { parseIsoDateParam } from "@/lib/transactions/date-range";
 import type { TransactionWithRelations } from "@/lib/transactions/types";
 
 interface TransactionsViewProps {
@@ -69,12 +66,6 @@ export function TransactionsView({
     return evaluateManyTransactions(inputs, { peerTransactions: inputs });
   }, [transactions]);
 
-  const quickAddDateContext = useMemo(() => {
-    const from = parseIsoDateParam(searchParams.get("from") ?? undefined);
-    const to = parseIsoDateParam(searchParams.get("to") ?? undefined);
-    return buildQuickAddDateContextFromFilter(from, to);
-  }, [searchParams]);
-
   return (
   <>
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -83,16 +74,10 @@ export function TransactionsView({
           {transactions.length === 1 ? "transaction" : "transactions"}
         </p>
         <div className="flex flex-wrap gap-2">
-          <QuickAddButton
-            categories={categories}
-            hmrcCategories={hmrcCategories}
-            dateContext={quickAddDateContext}
-            variant="outline"
-          />
           <Button type="button" variant="outline" asChild>
             <Link href="/transactions/import">
               <Upload className="h-4 w-4" />
-              Import
+              Import statement
             </Link>
           </Button>
           <Button type="button" onClick={() => setCreateOpen(true)}>
@@ -118,18 +103,19 @@ export function TransactionsView({
         <div className="mb-4 flex flex-col gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="font-medium">
-              {uncategorisedCount} uncategorised transaction
-              {uncategorisedCount === 1 ? "" : "s"}
+              {uncategorisedCount} transaction
+              {uncategorisedCount === 1 ? "" : "s"} need
+              {uncategorisedCount === 1 ? "s" : ""} a category
             </p>
             <p className="text-sm text-muted-foreground">
-              Answer simple questions — we map categories and HMRC behind the
-              scenes.
+              Answer a few quick questions — we sort out the categories and tax
+              behind the scenes.
             </p>
           </div>
           <Button type="button" variant="secondary" asChild className="shrink-0">
             <Link href={CATEGORISE_ASSISTANT_PATH}>
               <Sparkles className="h-4 w-4" />
-              Business categorisation
+              Sort these out
             </Link>
           </Button>
         </div>

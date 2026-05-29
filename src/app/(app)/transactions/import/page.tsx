@@ -1,8 +1,5 @@
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { ImportWizard } from "@/components/import/import-wizard";
-import { Button } from "@/components/ui/button";
 import { requireAuth } from "@/lib/auth/helpers";
 import { getAccounts } from "@/lib/accounts/queries";
 
@@ -16,16 +13,10 @@ export default async function ImportTransactionsPage() {
 
   return (
     <>
-      <div className="mb-4">
-        <Button type="button" variant="ghost" size="sm" asChild>
-          <Link href="/transactions">
-            <ArrowLeft className="h-4 w-4" />
-            Back to transactions
-          </Link>
-        </Button>
-      </div>
       <PageHeader
-        title="Import Center"
+        backHref="/transactions"
+        backLabel="Back to transactions"
+        title="Import statement"
         description="Upload a PDF bank statement or CSV file. Review transactions before importing."
       />
       {accounts.length === 0 ? (
