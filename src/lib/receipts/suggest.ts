@@ -103,6 +103,8 @@ export function buildReceiptCreationSuggestion(options: {
   rawText: string | null;
   paymentMethod: ReceiptPaymentMethod | null;
   purpose?: ReceiptPurpose;
+  /** Explicit category chosen by the user — overrides the detected one. */
+  categoryChoiceId?: CategoryChoiceId | null;
   categories: CategoryRow[];
   hmrcCategories: HmrcCategoryRow[];
 }): ReceiptCreationSuggestion {
@@ -114,7 +116,8 @@ export function buildReceiptCreationSuggestion(options: {
   const purpose = options.purpose ?? purposeDefault;
   const payment = options.paymentMethod;
 
-  const choiceId = choiceIdForPurpose(purpose, classification);
+  const choiceId =
+    options.categoryChoiceId ?? choiceIdForPurpose(purpose, classification);
   const categorisePurpose: CategorisePurpose =
     purpose === "not_sure" ? "not_sure" : purpose;
 

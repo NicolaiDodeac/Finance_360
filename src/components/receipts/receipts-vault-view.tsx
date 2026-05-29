@@ -7,6 +7,7 @@ import { ReceiptListItem } from "@/components/receipts/receipt-list-item";
 import { ReceiptUnmatchedSection } from "@/components/receipts/receipt-unmatched-section";
 import { ReceiptCaptureHub } from "@/components/receipts/receipt-capture-hub";
 import { ReceiptUploadForm } from "@/components/receipts/receipt-upload-form";
+import { ListPaginationControls } from "@/components/shared/list-pagination-controls";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { CategoryRow } from "@/lib/categories/queries";
 import type { HmrcCategoryRow } from "@/lib/hmrc/queries";
@@ -15,6 +16,11 @@ import type { TaxYearRow } from "@/lib/tax-years/queries";
 
 interface ReceiptsVaultViewProps {
   receipts: ReceiptWithRelations[];
+  receiptTotalCount: number;
+  receiptPage: number;
+  receiptPageSize: number;
+  needsReview: ReceiptWithRelations[];
+  unmatched: ReceiptWithRelations[];
   taxYears: TaxYearRow[];
   categories: CategoryRow[];
   hmrcCategories: HmrcCategoryRow[];
@@ -24,6 +30,11 @@ interface ReceiptsVaultViewProps {
 
 export function ReceiptsVaultView({
   receipts,
+  receiptTotalCount,
+  receiptPage,
+  receiptPageSize,
+  needsReview,
+  unmatched,
   taxYears,
   categories,
   hmrcCategories,
@@ -50,29 +61,9 @@ export function ReceiptsVaultView({
     setSelected(receipt);
   }
 
-  const needsReview = useMemo(
-    () =>
-      receipts.filter(
-        (r) =>
-          !r.attached_transaction &&
-          (r as { status?: string }).status === "needs_review"
-      ),
-    [receipts]
-  );
-
-  const unmatched = useMemo(
-    () =>
-      receipts.filter(
-        (r) =>
-          !r.attached_transaction &&
-          (r as { status?: string }).status !== "needs_review"
-      ),
-    [receipts]
-  );
-
-  const matched = useMemo(
-    () => receipts.filter((r) => r.attached_transaction),
-    [receipts]
+  const matchedCount = useMemo(
+    () => receiptTotalCount - needsReview.length - unmatched.length,
+    [receiptTotalCount, needsReview.length, unmatched.length]
   );
 
   return (
@@ -136,31 +127,39 @@ export function ReceiptsVaultView({
         <CardHeader>
           <CardTitle className="text-base">All stored proof</CardTitle>
           <CardDescription>
-            {receipts.length}{" "}
-            {receipts.length === 1 ? "receipt" : "receipts"} in your vault
+            {receiptTotalCount}{" "}
+            {receiptTotalCount === 1 ? "receipt" : "receipts"} in your vault
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
-          {receipts.length === 0 ? (
+          {receiptTotalCount === 0 ? (
             <p className="text-sm text-muted-foreground">
               Nothing stored yet. Capture a receipt above and we&apos;ll read the
               details for you.
             </p>
           ) : (
-            receipts.map((receipt) => (
-              <ReceiptListItem
-                key={receipt.id}
-                receipt={receipt}
-                onSelect={handleReceiptSelect}
+            <>
+              {receipts.map((receipt) => (
+                <ReceiptListItem
+                  key={receipt.id}
+                  receipt={receipt}
+                  onSelect={handleReceiptSelect}
+                />
+              ))}
+              <ListPaginationControls
+                page={receiptPage}
+                pageSize={receiptPageSize}
+                totalCount={receiptTotalCount}
+                itemLabel="receipts"
               />
-            ))
+            </>
           )}
         </CardContent>
       </Card>
 
-      {matched.length > 0 && unmatched.length > 0 ? (
+      {matchedCount > 0 && unmatched.length > 0 ? (
         <p className="text-center text-xs text-muted-foreground">
-          {matched.length} linked · {unmatched.length} waiting to match
+          {matchedCount} linked · {unmatched.length} waiting to match
         </p>
       ) : null}
 

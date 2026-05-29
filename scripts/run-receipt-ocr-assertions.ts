@@ -5,7 +5,10 @@ import {
   extractMerchantFromReceiptText,
 } from "../src/lib/receipts/ocr/extract-merchant";
 import { classifyReceiptText } from "../src/lib/receipts/classify";
+import { deriveReceiptStatus } from "../src/lib/receipts/status";
 import { RECEIPT_FIXTURES } from "../src/lib/receipts/ocr/__fixtures__/receipt-fixtures";
+
+const TERMINAL_REVIEW_LEVELS = new Set(["high", "medium", "needs_review"]);
 
 /** Simulates wrinkled-receipt OCR: garbage header line + real Tesco token. */
 const TESCO_WRINKLED_OCR = `
@@ -140,6 +143,26 @@ for (const fixture of RECEIPT_FIXTURES) {
       `${where} classification: expected ${expect.classificationPattern}, got ${classification.patternId}`
     );
   }
+
+  // Regression guard: every parse must resolve to a terminal review level and
+  // must never derive a stuck "processing" status.
+  assert(
+    TERMINAL_REVIEW_LEVELS.has(parsed.reviewLevel),
+    `${where} reviewLevel must be terminal, got ${parsed.reviewLevel}`
+  );
+  const derived = deriveReceiptStatus(
+    {
+      merchant_name: parsed.merchant,
+      total_amount: parsed.totalAmount,
+      receipt_date: parsed.receiptDate,
+      status: "ready",
+    },
+    parsed
+  );
+  assert(
+    derived !== "processing",
+    `${where} completed parse must not derive a stuck processing status (got ${derived})`
+  );
 }
 
 // Original receipt text must always be preserved for audit, even for noisy scans.

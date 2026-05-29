@@ -169,6 +169,73 @@ VISA CREDIT`,
     },
   },
   {
+    id: "rontec_fuel_large",
+    description: "Rontec fuel receipt — large cash fill, must not pick VAT",
+    text: `RONTEC TRENCH LOCK
+Service Station
+25/05/2026 16:40
+Unleaded 68.78 L
+Price/L 1.460
+Fuel 100.42
+TOTAL £100.42
+VAT £16.74
+CASH`,
+    expect: {
+      totalAmount: 100.42,
+      receiptDate: "2026-05-25",
+      paymentMethod: "cash",
+      vatAmount: 16.74,
+      classificationPattern: "fuel",
+      reviewLevel: "high",
+    },
+  },
+  {
+    id: "rontec_fuel_small",
+    description: "Rontec fuel receipt — small cash fill",
+    text: `RONTEC TRENCH LOCK
+Service Station
+18/03/2026 09:05
+Diesel 20.55 L
+Fuel 30.00
+TOTAL £30.00
+VAT £5.00
+CASH`,
+    expect: {
+      totalAmount: 30,
+      receiptDate: "2026-03-18",
+      paymentMethod: "cash",
+      vatAmount: 5,
+      classificationPattern: "fuel",
+      reviewLevel: "high",
+    },
+  },
+  {
+    id: "bq_hardware",
+    description:
+      "B&Q DIY/garden receipt — cash; promo footer must NOT trigger software/ads",
+    text: `B&Q
+Telford 1122
+Telford Bridge, Retail Park, Telford
+WESTLAND PEAT FREE MPC 8.50
+RESOLVA PATH & DRIVE WEEDKILLER 5.50
+VERVE GENERAL PURPOSE GARDEN GLOVE 2.60
+BYPASS SECATEUR 5.00
+TOTAL £64.80
+Cash £65.00
+Shopping is now faster and easier than ever with the B&Q app.
+Search B&Q in the App Store and Google Play store today.
+02/05/2026 12:32`,
+    expect: {
+      merchant: "B&Q",
+      knownMerchantId: "bq",
+      totalAmount: 64.8,
+      receiptDate: "2026-05-02",
+      paymentMethod: "cash",
+      classificationPattern: "diy_hardware",
+      reviewLevel: "high",
+    },
+  },
+  {
     id: "bad_noisy",
     description: "Bad/noisy receipt — no usable fields, must need review",
     text: `### ~~~ @@@@

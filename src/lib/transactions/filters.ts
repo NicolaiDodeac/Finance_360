@@ -1,3 +1,4 @@
+import { parsePageParam } from "@/lib/pagination/types";
 import { parseIsoDateParam } from "@/lib/transactions/date-range";
 import type {
   BusinessScopeFilter,
@@ -14,6 +15,7 @@ export interface TransactionSearchParams {
   hmrc?: string;
   from?: string;
   to?: string;
+  page?: string;
 }
 
 export function parseTransactionSearchParams(
@@ -41,5 +43,6 @@ export function parseTransactionSearchParams(
       : undefined,
     from: parseIsoDateParam(params.from),
     to: parseIsoDateParam(params.to),
+    page: parsePageParam(params.page),
   };
 }

@@ -1,11 +1,20 @@
 import { createClient } from "@/lib/supabase/server";
 import { getTaxYears } from "@/lib/tax-years/queries";
+import {
+  paginationRange,
+  parsePageParam,
+  type PaginatedResult,
+} from "@/lib/pagination/types";
 import { RECEIPTS_BUCKET, SIGNED_URL_EXPIRY_SECONDS } from "@/lib/receipts/constants";
 import type {
   ReceiptAttachedTransaction,
   ReceiptRow,
   ReceiptWithRelations,
 } from "@/lib/receipts/types";
+
+export const RECEIPTS_PAGE_SIZE = 20;
+
+export { parsePageParam };
 
 const ATTACHED_TRANSACTION_SELECT =
   "id, transaction_date, description, merchant_name, amount, direction, is_business, receipt_id, category_id, hmrc_category_id, tax_year_id, account_id, category:categories(id, name), hmrc:hmrc_categories(id, name), account:accounts(id, name, account_type), linked_receipt:receipts(id, merchant_name, original_filename, total_amount, receipt_date)";
@@ -27,27 +36,15 @@ async function loadTaxYearsById(userId: string) {
   return new Map(taxYears.map((ty) => [ty.id, { id: ty.id, label: ty.label }]));
 }
 
-export async function getReceipts(
-  userId: string
+async function enrichWithAttachments(
+  userId: string,
+  rows: ReceiptRow[]
 ): Promise<ReceiptWithRelations[]> {
-  const supabase = await createClient();
-
-  const { data: receipts, error } = await supabase
-    .from("receipts")
-    .select("*")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  const rows = (receipts ?? []) as ReceiptRow[];
-
   if (rows.length === 0) {
     return [];
   }
 
+  const supabase = await createClient();
   const taxYearsById = await loadTaxYearsById(userId);
   const withTaxYears = attachTaxYears(rows, taxYearsById);
 
@@ -73,6 +70,90 @@ export async function getReceipts(
     ...row,
     attached_transaction: byReceiptId.get(row.id) ?? null,
   }));
+}
+
+export async function getReceipts(
+  userId: string
+): Promise<ReceiptWithRelations[]> {
+  const supabase = await createClient();
+
+  const { data: receipts, error } = await supabase
+    .from("receipts")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return enrichWithAttachments(userId, (receipts ?? []) as ReceiptRow[]);
+}
+
+export async function countReceipts(userId: string): Promise<number> {
+  const supabase = await createClient();
+  const { count, error } = await supabase
+    .from("receipts")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return count ?? 0;
+}
+
+export async function getReceiptsPage(
+  userId: string,
+  options?: { page?: number; pageSize?: number }
+): Promise<PaginatedResult<ReceiptWithRelations>> {
+  const page = options?.page ?? 1;
+  const pageSize = options?.pageSize ?? RECEIPTS_PAGE_SIZE;
+  const totalCount = await countReceipts(userId);
+
+  if (totalCount === 0) {
+    return { items: [], totalCount: 0, page: 1, pageSize };
+  }
+
+  const { from, to } = paginationRange(page, pageSize, totalCount);
+  const supabase = await createClient();
+  const { data: receipts, error } = await supabase
+    .from("receipts")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .range(from, to);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const items = await enrichWithAttachments(
+    userId,
+    (receipts ?? []) as ReceiptRow[]
+  );
+
+  return { items, totalCount, page, pageSize };
+}
+
+/** Priority receipts that need user attention — fetched in full (usually small). */
+export async function getReceiptPrioritySections(userId: string): Promise<{
+  needsReview: ReceiptWithRelations[];
+  unmatched: ReceiptWithRelations[];
+}> {
+  const all = await getReceipts(userId);
+  const needsReview = all.filter(
+    (r) =>
+      !r.attached_transaction &&
+      (r as { status?: string }).status === "needs_review"
+  );
+  const unmatched = all.filter(
+    (r) =>
+      !r.attached_transaction &&
+      (r as { status?: string }).status !== "needs_review"
+  );
+  return { needsReview, unmatched };
 }
 
 export async function getReceiptById(

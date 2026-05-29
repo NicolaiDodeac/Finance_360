@@ -1,10 +1,17 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, CheckCircle2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { LoadMoreButton } from "@/components/shared/list-pagination-controls";
 import { formatCount, formatMoney } from "@/lib/tax/format";
 import type { SaLikelyBusinessIncomeItem } from "@/lib/self-assessment/types";
 import type { TaxReviewItem } from "@/lib/tax/types";
+
+const REVIEW_BATCH_SIZE = 10;
+const INCOME_BATCH_SIZE = 10;
 
 interface SaReviewSectionProps {
   items: TaxReviewItem[];
@@ -15,6 +22,11 @@ export function SaReviewSection({
   items,
   likelyBusinessIncome,
 }: SaReviewSectionProps) {
+  const [visibleReviewCount, setVisibleReviewCount] = useState(REVIEW_BATCH_SIZE);
+  const [visibleIncomeCount, setVisibleIncomeCount] = useState(INCOME_BATCH_SIZE);
+
+  const visibleItems = items.slice(0, visibleReviewCount);
+  const visibleIncome = likelyBusinessIncome.slice(0, visibleIncomeCount);
   const hasItems = items.length > 0 || likelyBusinessIncome.length > 0;
 
   return (
@@ -41,11 +53,22 @@ export function SaReviewSection({
             </p>
           </div>
         ) : (
-          <ul className="space-y-3">
-            {items.map((item) => (
-              <ReviewRow key={item.id} item={item} />
-            ))}
-          </ul>
+          <>
+            <ul className="space-y-3">
+              {visibleItems.map((item) => (
+                <ReviewRow key={item.id} item={item} />
+              ))}
+            </ul>
+            <LoadMoreButton
+              visibleCount={visibleItems.length}
+              totalCount={items.length}
+              batchSize={REVIEW_BATCH_SIZE}
+              itemLabel="items"
+              onLoadMore={() =>
+                setVisibleReviewCount((n) => n + REVIEW_BATCH_SIZE)
+              }
+            />
+          </>
         )}
 
         {likelyBusinessIncome.length > 0 ? (
@@ -54,7 +77,7 @@ export function SaReviewSection({
               Income that may be business
             </p>
             <ul className="divide-y divide-border rounded-lg border border-border">
-              {likelyBusinessIncome.slice(0, 5).map((item) => (
+              {visibleIncome.map((item) => (
                 <li
                   key={item.id}
                   className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
@@ -73,12 +96,15 @@ export function SaReviewSection({
                 </li>
               ))}
             </ul>
-            {likelyBusinessIncome.length > 5 ? (
-              <p className="text-xs text-muted-foreground">
-                And {likelyBusinessIncome.length - 5} more — see transactions
-                list.
-              </p>
-            ) : null}
+            <LoadMoreButton
+              visibleCount={visibleIncome.length}
+              totalCount={likelyBusinessIncome.length}
+              batchSize={INCOME_BATCH_SIZE}
+              itemLabel="items"
+              onLoadMore={() =>
+                setVisibleIncomeCount((n) => n + INCOME_BATCH_SIZE)
+              }
+            />
             <Link
               href={likelyBusinessIncome[0]?.transactionsLink ?? "/transactions"}
               className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"

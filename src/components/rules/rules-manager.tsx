@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { LoadMoreButton } from "@/components/shared/list-pagination-controls";
 import {
   Drawer,
   DrawerBody,
@@ -29,6 +30,8 @@ import type { CategorizationRuleRow } from "@/lib/categorization/types";
 import type { CategoryRow } from "@/lib/categories/queries";
 import type { HmrcCategoryRow } from "@/lib/hmrc/queries";
 
+const RULES_PAGE_SIZE = 25;
+
 interface RulesManagerProps {
   rules: CategorizationRuleRow[];
   categories: CategoryRow[];
@@ -49,6 +52,12 @@ export function RulesManager({
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [visibleRuleCount, setVisibleRuleCount] = useState(RULES_PAGE_SIZE);
+
+  const paginateRules = rules.length > RULES_PAGE_SIZE;
+  const visibleRules = paginateRules
+    ? rules.slice(0, visibleRuleCount)
+    : rules;
 
   function openCreate() {
     setEditing(null);
@@ -122,13 +131,25 @@ export function RulesManager({
       <RulesRepairBanner repairableCount={repairableRuleCount} />
 
       <RulesList
-        rules={rules}
+        rules={visibleRules}
         categories={categories}
         hmrcCategories={hmrcCategories}
         onEdit={openEdit}
         onDelete={handleDelete}
         deletingId={deletingId}
       />
+
+      {paginateRules ? (
+        <LoadMoreButton
+          visibleCount={visibleRules.length}
+          totalCount={rules.length}
+          batchSize={RULES_PAGE_SIZE}
+          itemLabel="rules"
+          onLoadMore={() =>
+            setVisibleRuleCount((n) => n + RULES_PAGE_SIZE)
+          }
+        />
+      ) : null}
 
       <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
         <DrawerContent>

@@ -12,6 +12,8 @@ import type { ImportPreviewMerchantGroup } from "@/lib/import/preview-groups";
 import type { ImportPreviewRow } from "@/lib/import/types";
 import type { HmrcCategoryRow } from "@/lib/hmrc/queries";
 
+const PREVIEW_ROW_LIMIT = 25;
+
 interface ImportPreviewStepProps {
   rows: ImportPreviewRow[];
   previewGroups: ImportPreviewMerchantGroup[];
@@ -54,6 +56,12 @@ export function ImportPreviewStep({
 }: ImportPreviewStepProps) {
   const newCount = rows.filter((r) => r.status === "new").length;
   const duplicateCount = rows.length - newCount;
+  const categorisedNewCount = rows.filter(
+    (r) => r.status === "new" && r.matched_rule_name
+  ).length;
+  const needsCategoryCount = uncategorisedNewCount;
+  const visibleRows = rows.slice(0, PREVIEW_ROW_LIMIT);
+  const hasMoreRows = rows.length > PREVIEW_ROW_LIMIT;
 
   return (
     <div className="space-y-6">
@@ -64,7 +72,19 @@ export function ImportPreviewStep({
         </p>
         <p className="mt-1 text-muted-foreground">
           {newCount} new · {duplicateCount} skipped as duplicates
+          {needsCategoryCount > 0
+            ? ` · ${needsCategoryCount} need${needsCategoryCount === 1 ? "s" : ""} a category`
+            : categorisedNewCount > 0
+              ? ` · ${categorisedNewCount} categorised by rules`
+              : ""}
         </p>
+        {rows.length > 0 ? (
+          <p className="mt-1 text-xs text-muted-foreground">
+            {hasMoreRows
+              ? `Showing ${PREVIEW_ROW_LIMIT} of ${rows.length} transactions in preview`
+              : `${rows.length} transaction${rows.length === 1 ? "" : "s"} in preview`}
+          </p>
+        ) : null}
       </div>
 
       {(previewGroups.length > 0 || uncategorisedNewCount > 0) && (
@@ -103,7 +123,7 @@ export function ImportPreviewStep({
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
+              {visibleRows.map((row) => (
                 <tr
                   key={row.preview_id}
                   className={
@@ -158,7 +178,7 @@ export function ImportPreviewStep({
         >
           {isImporting
             ? "Importing…"
-            : `Import ${newCount} transaction${newCount === 1 ? "" : "s"}`}
+            : `Import all ${newCount} transaction${newCount === 1 ? "" : "s"}`}
         </Button>
       </div>
     </div>

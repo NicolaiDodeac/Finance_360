@@ -36,6 +36,8 @@ export interface TransactionFilters {
   from?: string;
   /** Inclusive upper bound (YYYY-MM-DD). */
   to?: string;
+  /** 1-based page for list pagination. */
+  page?: number;
 }
 
 export interface TransactionFormInput {
