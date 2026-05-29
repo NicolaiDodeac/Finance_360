@@ -9,7 +9,8 @@
     "lint": "next lint",
     "check:hmrc": "npx --yes tsx scripts/run-hmrc-assertions.ts",
     "check:receipt-match": "npx --yes tsx scripts/run-receipt-match-assertions.ts",
-    "check:receipt-ocr": "npx --yes tsx scripts/run-receipt-ocr-assertions.ts"
+    "check:receipt-ocr": "npx --yes tsx scripts/run-receipt-ocr-assertions.ts",
+    "check:pagination": "npx --yes tsx scripts/run-pagination-assertions.ts"
   },
   "dependencies": {
     "@napi-rs/canvas": "^0.1.80",

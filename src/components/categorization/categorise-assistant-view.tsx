@@ -12,6 +12,7 @@ import {
   CategoriseToast,
   type CategoriseToastMessage,
 } from "@/components/categorization/categorise-toast";
+import { LoadMoreButton } from "@/components/shared/list-pagination-controls";
 import { Button } from "@/components/ui/button";
 import type { MerchantGroup } from "@/lib/categorization/assistant-types";
 import { splitMerchantGroup } from "@/lib/categorization/groups";
@@ -24,6 +25,7 @@ import type { CategoryRow } from "@/lib/categories/queries";
 import type { HmrcCategoryRow } from "@/lib/hmrc/queries";
 
 const SKIPPED_STORAGE_KEY = "finance360_categorise_skipped";
+const GROUPS_BATCH_SIZE = 10;
 
 interface CategoriseAssistantViewProps {
   initialGroups: MerchantGroup[];
@@ -70,10 +72,12 @@ export function CategoriseAssistantView({
     () => new Map()
   );
   const [toast, setToast] = useState<CategoriseToastMessage | null>(null);
+  const [visibleGroupCount, setVisibleGroupCount] = useState(GROUPS_BATCH_SIZE);
 
   useEffect(() => {
     setGroups(initialGroups);
     setSplitGroups(new Map());
+    setVisibleGroupCount(GROUPS_BATCH_SIZE);
   }, [initialGroups]);
 
   useEffect(() => {
@@ -150,6 +154,20 @@ export function CategoriseAssistantView({
 
   const groupsLeft = visibleGroups.length;
 
+  const visibleIncomeGroups = useMemo(
+    () => incomeGroups.slice(0, visibleGroupCount),
+    [incomeGroups, visibleGroupCount]
+  );
+
+  const visibleExpenseGroups = useMemo(() => {
+    const incomeShown = visibleIncomeGroups.length;
+    const remaining = Math.max(0, visibleGroupCount - incomeShown);
+    return expenseGroups.slice(0, remaining);
+  }, [expenseGroups, visibleGroupCount, visibleIncomeGroups.length]);
+
+  const displayedGroupCount =
+    visibleIncomeGroups.length + visibleExpenseGroups.length;
+
   if (groups.length === 0 && reviewDeferredCount === 0) {
     return <AllCaughtUpEmpty />;
   }
@@ -210,7 +228,7 @@ export function CategoriseAssistantView({
               <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
                 Income
               </h2>
-              {incomeGroups.map((group) => (
+              {visibleIncomeGroups.map((group) => (
                 <BusinessMerchantGroupCard
                   key={group.groupKey}
                   group={group}
@@ -231,7 +249,7 @@ export function CategoriseAssistantView({
               <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
                 Spending
               </h2>
-              {expenseGroups.map((group) => (
+              {visibleExpenseGroups.map((group) => (
                 <BusinessMerchantGroupCard
                   key={group.groupKey}
                   group={group}
@@ -246,6 +264,16 @@ export function CategoriseAssistantView({
               ))}
             </section>
           )}
+
+          <LoadMoreButton
+            visibleCount={displayedGroupCount}
+            totalCount={visibleGroups.length}
+            batchSize={GROUPS_BATCH_SIZE}
+            itemLabel="groups"
+            onLoadMore={() =>
+              setVisibleGroupCount((n) => n + GROUPS_BATCH_SIZE)
+            }
+          />
         </>
       )}
     </div>

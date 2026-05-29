@@ -1,16 +1,25 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, CheckCircle2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { LoadMoreButton } from "@/components/shared/list-pagination-controls";
 import { buildReceiptsLink } from "@/lib/tax/links";
 import { formatCount } from "@/lib/tax/format";
 import type { TaxReviewItem } from "@/lib/tax/types";
+
+const REVIEW_BATCH_SIZE = 10;
 
 interface TaxReviewSectionProps {
   items: TaxReviewItem[];
 }
 
 export function TaxReviewSection({ items }: TaxReviewSectionProps) {
+  const [visibleCount, setVisibleCount] = useState(REVIEW_BATCH_SIZE);
+  const visibleItems = items.slice(0, visibleCount);
+
   return (
     <Card>
       <CardHeader>
@@ -35,31 +44,42 @@ export function TaxReviewSection({ items }: TaxReviewSectionProps) {
             </p>
           </div>
         ) : (
-          <ul className="space-y-3">
-            {items.map((item) => (
-              <li
-                key={item.id}
-                className="flex flex-col gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="min-w-0 space-y-1">
-                  <p className="font-medium text-foreground">{item.title}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {item.description}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatCount(item.count, "transaction")}
-                  </p>
-                </div>
-                <Link
-                  href={item.href}
-                  className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-primary hover:underline"
+          <>
+            <ul className="space-y-3">
+              {visibleItems.map((item) => (
+                <li
+                  key={item.id}
+                  className="flex flex-col gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
                 >
-                  View transactions
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </Link>
-              </li>
-            ))}
-          </ul>
+                  <div className="min-w-0 space-y-1">
+                    <p className="font-medium text-foreground">{item.title}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {item.description}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatCount(item.count, "transaction")}
+                    </p>
+                  </div>
+                  <Link
+                    href={item.href}
+                    className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-primary hover:underline"
+                  >
+                    View transactions
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            <LoadMoreButton
+              visibleCount={visibleItems.length}
+              totalCount={items.length}
+              batchSize={REVIEW_BATCH_SIZE}
+              itemLabel="items"
+              onLoadMore={() =>
+                setVisibleCount((n) => n + REVIEW_BATCH_SIZE)
+              }
+            />
+          </>
         )}
 
         <p className="mt-4 text-xs text-muted-foreground">

@@ -9,6 +9,7 @@ import { TransactionCreateDrawer } from "@/components/transactions/transaction-c
 import { TransactionEditDrawer } from "@/components/transactions/transaction-edit-drawer";
 import { TransactionFilters } from "@/components/transactions/transaction-filters";
 import { TransactionList } from "@/components/transactions/transaction-list";
+import { ListPaginationControls } from "@/components/shared/list-pagination-controls";
 import { EvidenceExplainerPanel } from "@/components/evidence/evidence-explainer-panel";
 import { TransactionsEmptyState } from "@/components/transactions/transactions-empty-state";
 import type { AccountRow } from "@/lib/accounts/queries";
@@ -25,6 +26,9 @@ import type { TransactionWithRelations } from "@/lib/transactions/types";
 
 interface TransactionsViewProps {
   transactions: TransactionWithRelations[];
+  transactionTotalCount: number;
+  transactionPage: number;
+  transactionPageSize: number;
   accounts: AccountRow[];
   categories: CategoryRow[];
   hmrcCategories: HmrcCategoryRow[];
@@ -36,6 +40,9 @@ interface TransactionsViewProps {
 
 export function TransactionsView({
   transactions,
+  transactionTotalCount,
+  transactionPage,
+  transactionPageSize,
   accounts,
   categories,
   hmrcCategories,
@@ -70,8 +77,8 @@ export function TransactionsView({
   <>
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-muted-foreground">
-          {transactions.length}{" "}
-          {transactions.length === 1 ? "transaction" : "transactions"}
+          {transactionTotalCount}{" "}
+          {transactionTotalCount === 1 ? "transaction" : "transactions"}
         </p>
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" asChild>
@@ -125,7 +132,7 @@ export function TransactionsView({
         <TransactionFilters categories={categories} taxYears={taxYears} />
       </div>
 
-      {transactions.length === 0 ? (
+      {transactionTotalCount === 0 ? (
         <TransactionsEmptyState
           hasFilters={hasFilters}
           onAddClick={() => setCreateOpen(true)}
@@ -136,6 +143,12 @@ export function TransactionsView({
             transactions={transactions}
             evidenceByTransactionId={evidenceByTransactionId}
             onSelect={setEditing}
+          />
+          <ListPaginationControls
+            page={transactionPage}
+            pageSize={transactionPageSize}
+            totalCount={transactionTotalCount}
+            itemLabel="transactions"
           />
           <div className="mt-8">
             <EvidenceExplainerPanel />

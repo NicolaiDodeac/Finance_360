@@ -1,10 +1,16 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { LoadMoreButton } from "@/components/shared/list-pagination-controls";
 import { buildTransactionsLink } from "@/lib/tax/links";
 import { formatCount, formatMoney } from "@/lib/tax/format";
 import type { TaxCategoryBreakdownRow } from "@/lib/tax/types";
+
+const BREAKDOWN_BATCH_SIZE = 10;
 
 interface TaxCategoryBreakdownProps {
   rows: TaxCategoryBreakdownRow[];
@@ -15,6 +21,9 @@ export function TaxCategoryBreakdown({
   rows,
   taxYearId,
 }: TaxCategoryBreakdownProps) {
+  const [visibleCount, setVisibleCount] = useState(BREAKDOWN_BATCH_SIZE);
+  const visibleRows = rows.slice(0, visibleCount);
+
   if (rows.length === 0) {
     return (
       <Card>
@@ -39,7 +48,7 @@ export function TaxCategoryBreakdown({
       </CardHeader>
       <CardContent className="space-y-3">
         <ul className="divide-y divide-border rounded-lg border border-border">
-          {rows.map((row) => (
+          {visibleRows.map((row) => (
             <li
               key={row.hmrcCategoryId}
               className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
@@ -76,6 +85,15 @@ export function TaxCategoryBreakdown({
             </li>
           ))}
         </ul>
+        <LoadMoreButton
+          visibleCount={visibleRows.length}
+          totalCount={rows.length}
+          batchSize={BREAKDOWN_BATCH_SIZE}
+          itemLabel="categories"
+          onLoadMore={() =>
+            setVisibleCount((n) => n + BREAKDOWN_BATCH_SIZE)
+          }
+        />
       </CardContent>
     </Card>
   );

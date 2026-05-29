@@ -58,6 +58,10 @@ export function TransactionFilters({
         }
       }
 
+      if (!("page" in updates)) {
+        params.delete("page");
+      }
+
       startTransition(() => {
         router.replace(`${pathname}?${params.toString()}`);
       });

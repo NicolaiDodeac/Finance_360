@@ -12,7 +12,7 @@ import {
   type TransactionSearchParams,
 } from "@/lib/transactions/filters";
 import { getUncategorisedTransactionCount } from "@/lib/categorization/assistant-queries";
-import { getTransactions } from "@/lib/transactions/queries";
+import { getTransactionsPage } from "@/lib/transactions/queries";
 
 interface TransactionsPageProps {
   searchParams: Promise<TransactionSearchParams>;
@@ -28,7 +28,10 @@ async function TransactionsContent({
   const filters = parseTransactionSearchParams(resolvedSearchParams);
 
   let loadError: string | null = null;
-  let transactions: Awaited<ReturnType<typeof getTransactions>> = [];
+  let transactions: Awaited<ReturnType<typeof getTransactionsPage>>["items"] = [];
+  let transactionTotalCount = 0;
+  let transactionPage = 1;
+  let transactionPageSize = 25;
   let accounts: Awaited<ReturnType<typeof getAccounts>> = [];
   let categories: Awaited<ReturnType<typeof getCategories>> = [];
   let hmrcCategories: Awaited<ReturnType<typeof getHmrcCategories>> = [];
@@ -37,23 +40,21 @@ async function TransactionsContent({
   let uncategorisedCount = 0;
 
   try {
-    [
-      accounts,
-      categories,
-      hmrcCategories,
-      taxYears,
-      transactions,
-      unmatchedReceipts,
-      uncategorisedCount,
-    ] = await Promise.all([
+    const [pageResult, ...rest] = await Promise.all([
+      getTransactionsPage(user.id, filters, { page: filters.page }),
       getAccounts(user.id),
       getCategories(user.id),
       getHmrcCategories(),
       getTaxYears(user.id),
-      getTransactions(user.id, filters),
       getUnmatchedReceipts(user.id),
       getUncategorisedTransactionCount(user.id),
     ]);
+    transactions = pageResult.items;
+    transactionTotalCount = pageResult.totalCount;
+    transactionPage = pageResult.page;
+    transactionPageSize = pageResult.pageSize;
+    [accounts, categories, hmrcCategories, taxYears, unmatchedReceipts, uncategorisedCount] =
+      rest;
   } catch (err) {
     loadError =
       err instanceof Error ? err.message : "Failed to load transactions.";
@@ -62,6 +63,9 @@ async function TransactionsContent({
   return (
     <TransactionsView
       transactions={transactions}
+      transactionTotalCount={transactionTotalCount}
+      transactionPage={transactionPage}
+      transactionPageSize={transactionPageSize}
       accounts={accounts}
       categories={categories}
       hmrcCategories={hmrcCategories}
