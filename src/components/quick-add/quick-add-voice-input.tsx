@@ -58,7 +58,6 @@ export function QuickAddVoiceInput({
     transcript,
     interimTranscript,
     error,
-    languageFallbackNotice,
     startListening,
     stopListening,
     resetTranscript,
@@ -178,8 +177,8 @@ export function QuickAddVoiceInput({
         </div>
       ) : null}
 
-      {languageFallbackNotice ? (
-        <p className="text-xs text-muted-foreground">{languageFallbackNotice}</p>
+      {isSupported && !isListening ? (
+        <p className="text-xs text-muted-foreground">Speak naturally in English.</p>
       ) : null}
 
       {!isSupported ? (

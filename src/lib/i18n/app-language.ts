@@ -7,24 +7,13 @@ export const APP_LANGUAGE_LABELS: Record<AppLanguage, string> = {
   uk: "Українська",
 };
 
-/** BCP-47 locales for Web Speech API. */
-export type SpeechRecognitionLocale = "en-GB" | "uk-UA";
+/**
+ * Speech recognition always runs in English (UK), independent of the app
+ * language. This keeps voice capture reliable for UK merchant names.
+ */
+export type SpeechRecognitionLocale = "en-GB";
 
-export const SPEECH_LOCALE_BY_APP_LANGUAGE: Record<
-  AppLanguage,
-  SpeechRecognitionLocale
-> = {
-  en: "en-GB",
-  uk: "uk-UA",
-};
-
-export const SPEECH_FALLBACK_LOCALE: SpeechRecognitionLocale = "en-GB";
-
-export function getSpeechLocaleForAppLanguage(
-  language: AppLanguage
-): SpeechRecognitionLocale {
-  return SPEECH_LOCALE_BY_APP_LANGUAGE[language];
-}
+export const SPEECH_RECOGNITION_LOCALE: SpeechRecognitionLocale = "en-GB";
 
 export function isAppLanguage(value: string | null | undefined): value is AppLanguage {
   return value === "en" || value === "uk";

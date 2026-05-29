@@ -74,6 +74,8 @@ export function ReceiptCaptureReviewView({
     financeMode,
     similarReceipts,
   } = review;
+  const reviewLevel = extraction.reviewLevel ?? "medium";
+  const uncertainHint = buildUncertainHint(extraction);
   const isDev = process.env.NODE_ENV === "development";
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -269,6 +271,12 @@ export function ReceiptCaptureReviewView({
     <div className="mx-auto max-w-lg space-y-5 pb-8">
       <ProofBanner />
 
+      {uncertainHint ? (
+        <p className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-sm font-medium text-foreground">
+          {uncertainHint}
+        </p>
+      ) : null}
+
       <ReceiptSimilarBanner
         similarReceipts={similarReceipts}
         onDeleteCurrent={handleDelete}
@@ -281,6 +289,10 @@ export function ReceiptCaptureReviewView({
         </p>
       ) : null}
 
+      <div className="space-y-2">
+      <p className="text-xs font-medium text-muted-foreground">
+        We found these details
+      </p>
       <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
         <ReceiptFileIcon mimeType={receipt.mime_type} />
         <div className="min-w-0 flex-1">
@@ -321,6 +333,7 @@ export function ReceiptCaptureReviewView({
             disabled={isPending}
           />
         </div>
+      </div>
       </div>
 
       {editing ? (
@@ -373,7 +386,7 @@ export function ReceiptCaptureReviewView({
         </form>
       ) : null}
 
-      {showBusinessPurpose ? (
+      {showBusinessPurpose && reviewLevel !== "high" ? (
         <section className="space-y-3 rounded-xl border border-border bg-card p-4">
           <p className="text-sm font-medium">What was this for?</p>
           <div className="grid gap-2">
@@ -617,6 +630,25 @@ function ProofBanner() {
       Receipt saved as proof.
     </p>
   );
+}
+
+/**
+ * Fast review hint. High confidence shows nothing (single-tap confirm).
+ * Medium confidence highlights only the one field worth checking.
+ */
+function buildUncertainHint(
+  extraction: ReceiptCaptureReviewData["extraction"]
+): string | null {
+  if (extraction.reviewLevel !== "medium") return null;
+
+  const fc = extraction.fieldConfidence;
+  if (!fc) return null;
+
+  if (fc.merchant === "low") return "Check this one field: the merchant.";
+  if (fc.total === "low") return "Check this one field: the amount.";
+  if (fc.date === "low") return "Check this one field: the date.";
+  if (fc.payment === "low") return "Check the payment method below.";
+  return "Quick check — confirm the details look right.";
 }
 
 function MatchDebugPanel({ match }: { match: ReceiptMatchCandidate }) {

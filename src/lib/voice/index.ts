@@ -1,11 +1,10 @@
 export {
   createSpeechRecognition,
-  createSpeechRecognitionForAppLanguage,
   isSpeechRecognitionSupported,
   mapSpeechRecognitionError,
+  normaliseMerchantSpeech,
   SPEECH_SILENCE_AUTO_STOP_MS,
   unsupportedSpeechMessage,
-  ukrainianFallbackNotice,
   vibrateSpeechFeedback,
 } from "@/lib/voice/speech-recognition";
 export type {

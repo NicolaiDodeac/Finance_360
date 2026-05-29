@@ -225,6 +225,11 @@ export async function getReceiptCaptureReview(
       ? (receipt.ocr_data as Record<string, unknown>)
       : null;
 
+  const storedFieldConfidence =
+    ocr?.field_confidence && typeof ocr.field_confidence === "object"
+      ? (ocr.field_confidence as ReceiptOcrExtraction["fieldConfidence"])
+      : EMPTY_RECEIPT_EXTRACTION.fieldConfidence;
+
   const extraction: ReceiptOcrExtraction = {
     merchant: receipt.merchant_name,
     merchantSource:
@@ -235,6 +240,7 @@ export async function getReceiptCaptureReview(
         ? ocr.known_merchant_id
         : null,
     receiptDate: receipt.receipt_date,
+    dateIsFallback: ocr?.date_is_fallback === true,
     totalAmount:
       receipt.total_amount !== null ? Number(receipt.total_amount) : null,
     vatAmount: receipt.vat_amount !== null ? Number(receipt.vat_amount) : null,
@@ -246,6 +252,10 @@ export async function getReceiptCaptureReview(
     fieldsFound: Array.isArray(ocr?.fields_found)
       ? (ocr.fields_found as string[])
       : [],
+    fieldConfidence: storedFieldConfidence,
+    reviewLevel:
+      (ocr?.review_level as ReceiptOcrExtraction["reviewLevel"] | undefined) ??
+      "medium",
   };
 
   const classification = classifyReceiptText(
