@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { CategorisationEditPanel } from "@/components/categorization/categorisation-edit-panel";
 import { UniversalCategorisationReview } from "@/components/categorization/universal-categorisation-review";
 import {
   buildDetectedFields,
@@ -12,56 +13,68 @@ import {
   resolvePurposeNotSure,
 } from "@/lib/categorization/categorise-flow/resolve";
 import type { ReceiptCreationSuggestion } from "@/lib/receipts/suggest";
-import type { ReceiptPurpose } from "@/lib/receipts/classify";
+import {
+  receiptCaptureToTransactionForm,
+  transactionFormToReceiptCapture,
+  type ReceiptCaptureFormState,
+} from "@/lib/receipts/capture-form";
 import { formatMoney, formatTransactionDate } from "@/lib/receipts/format";
+import type { CategoryChoiceId } from "@/lib/categorization/categorise-flow/types";
 import type { CategoryRow } from "@/lib/categories/queries";
 import type { HmrcCategoryRow } from "@/lib/hmrc/queries";
 
 interface ReceiptCategorisationReviewProps {
-  merchant: string | null;
-  amount: number | null;
-  receiptDate: string | null;
+  captureForm: ReceiptCaptureFormState;
+  onCaptureFormChange: (form: ReceiptCaptureFormState) => void;
   paymentLabel: string;
-  purpose: ReceiptPurpose;
   suggestion: ReceiptCreationSuggestion;
   categories: CategoryRow[];
   hmrcCategories: HmrcCategoryRow[];
+  showBusinessPurpose?: boolean;
+  showPaymentField?: boolean;
   disabled?: boolean;
   isPending?: boolean;
   onConfirm: () => void;
-  purposePanel?: React.ReactNode;
 }
 
 export function ReceiptCategorisationReview({
-  merchant,
-  amount,
-  receiptDate,
+  captureForm,
+  onCaptureFormChange,
   paymentLabel,
-  purpose,
   suggestion,
   categories,
   hmrcCategories,
+  showBusinessPurpose = false,
+  showPaymentField = false,
   disabled,
   isPending,
   onConfirm,
-  purposePanel,
 }: ReceiptCategorisationReviewProps) {
+  const { merchant_name, receipt_date, total_amount, purpose } = captureForm;
+
+  const effectiveChoiceId =
+    captureForm.categoryChoiceId ?? suggestion.categoryChoiceId;
+
   const resolved = useMemo(() => {
-    if (purpose === "not_sure" || !suggestion.categoryChoiceId) {
+    if (purpose === "not_sure" || !effectiveChoiceId) {
       return resolvePurposeNotSure();
     }
     const catPurpose = purpose === "business" ? "business" : "personal";
     return resolveCategoryChoice(
       catPurpose,
-      suggestion.categoryChoiceId,
+      effectiveChoiceId,
       categories,
       hmrcCategories,
       100
     );
-  }, [purpose, suggestion.categoryChoiceId, categories, hmrcCategories]);
+  }, [purpose, effectiveChoiceId, categories, hmrcCategories]);
 
   const catPurpose =
-    purpose === "not_sure" ? ("not_sure" as const) : purpose === "business" ? "business" : "personal";
+    purpose === "not_sure"
+      ? ("not_sure" as const)
+      : purpose === "business"
+        ? "business"
+        : "personal";
 
   const suggested = buildSuggestedFromResolved(resolved, catPurpose, null);
   suggested.categoryLabel = suggestion.categoryLabel;
@@ -73,10 +86,13 @@ export function ReceiptCategorisationReview({
 
   const context = buildReviewContext({
     detected: buildDetectedFields({
-      merchant,
-      amount: amount !== null ? formatMoney(amount) : null,
+      merchant: merchant_name || null,
+      amount:
+        total_amount !== null && total_amount > 0
+          ? formatMoney(total_amount)
+          : null,
       paymentMethod: paymentLabel,
-      date: receiptDate ? formatTransactionDate(receiptDate) : null,
+      date: receipt_date ? formatTransactionDate(receipt_date) : null,
     }),
     suggested,
     direction: "expense",
@@ -84,10 +100,72 @@ export function ReceiptCategorisationReview({
     isBusiness: purpose === "business",
     suggestion: null,
     resolved,
-    amountValid: amount !== null && amount > 0,
-    dateValid: Boolean(receiptDate),
-    merchantKnown: Boolean(merchant),
+    amountValid: total_amount !== null && total_amount > 0,
+    dateValid: Boolean(receipt_date),
+    merchantKnown: Boolean(merchant_name?.trim()),
   });
+
+  const transactionForm = useMemo(
+    () =>
+      receiptCaptureToTransactionForm(
+        captureForm,
+        categories,
+        hmrcCategories,
+        suggestion
+      ),
+    [captureForm, categories, hmrcCategories, suggestion]
+  );
+
+  const panelProps = {
+    showPaymentPicker: true,
+    details: {
+      merchant: captureForm.merchant_name,
+      transactionDate: captureForm.receipt_date,
+      amount: captureForm.total_amount,
+      paymentMethod: captureForm.payment_method,
+    },
+    onDetailsChange: (details: {
+      merchant: string;
+      transactionDate: string;
+      amount: number | null;
+      paymentMethod?: typeof captureForm.payment_method;
+    }) =>
+      onCaptureFormChange({
+        ...captureForm,
+        merchant_name: details.merchant,
+        receipt_date: details.transactionDate,
+        total_amount: details.amount,
+        payment_method: details.paymentMethod ?? captureForm.payment_method,
+      }),
+    categoryForm: transactionForm,
+    onCategoryFormChange: (form: typeof transactionForm) =>
+      onCaptureFormChange(
+        transactionFormToReceiptCapture(form, captureForm, categories)
+      ),
+    categories,
+    hmrcCategories,
+    showBusinessPurpose,
+    showPaymentField,
+    disabled,
+    idPrefix: "rcpt",
+    allowNotSure: showBusinessPurpose,
+    isNotSure: purpose === "not_sure",
+    onPickPurpose: () =>
+      onCaptureFormChange({ ...captureForm, purpose: "personal" }),
+    onNotSure: () =>
+      onCaptureFormChange({
+        ...captureForm,
+        purpose: "not_sure",
+        categoryChoiceId: null,
+      }),
+    personalCategoryChoiceId: effectiveChoiceId,
+    onPersonalCategoryChange: (id: CategoryChoiceId) =>
+      onCaptureFormChange({
+        ...captureForm,
+        purpose: "personal",
+        categoryChoiceId: id,
+      }),
+  };
 
   return (
     <UniversalCategorisationReview
@@ -96,7 +174,7 @@ export function ReceiptCategorisationReview({
       confirmLabel={isPending ? "Saving…" : "Create from receipt"}
       disabled={disabled}
       isPending={isPending}
-      changePanel={purposePanel}
+      summaryPanel={<CategorisationEditPanel {...panelProps} mode="all" />}
       footerNote="Receipt saved as proof. You can change this anytime."
     />
   );

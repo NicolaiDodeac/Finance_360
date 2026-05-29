@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { SearchableChoiceButtons } from "@/components/categorization/flow/searchable-choice-buttons";
+import { CategoryChoiceSelect } from "@/components/shared/category-choice-select";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { FLOW_COPY, getCategoryChoices } from "@/lib/categorization/categorise-flow/mappings";
@@ -31,6 +32,8 @@ export interface TransactionCategoryFieldsProps {
   /** Prefix for input ids (receipt vs transaction edit). */
   idPrefix?: string;
   className?: string;
+  /** Searchable chips vs dropdown (receipt / quick add use dropdown). */
+  categoryInput?: "search" | "dropdown";
 }
 
 export function TransactionCategoryFields({
@@ -41,6 +44,7 @@ export function TransactionCategoryFields({
   disabled,
   idPrefix = "tx",
   className,
+  categoryInput = "search",
 }: TransactionCategoryFieldsProps) {
   const isIncome = form.direction === "income";
   const purpose = purposeFromForm(form);
@@ -113,36 +117,69 @@ export function TransactionCategoryFields({
           </div>
 
           <div className="space-y-2">
-            <Label>
-              {form.is_business ? "Business category" : "Personal category"}
-            </Label>
-            <p className="text-xs text-muted-foreground">
-              {form.is_business
-                ? "Options for tax and self assessment — different from personal spending."
-                : FLOW_COPY.categoryHint}
-            </p>
-            <SearchableChoiceButtons
-              key={`${idPrefix}-${purpose}-${form.direction}`}
-              choices={categoryChoices}
-              selectedId={choiceId}
-              disabled={disabled}
-              searchPlaceholder={
-                form.is_business
-                  ? "Search business category…"
-                  : "Search category…"
-              }
-              onSelect={(id) =>
-                onChange(
-                  applyChoiceToForm(
-                    form,
-                    id as CategoryChoiceId,
-                    purpose,
-                    categories,
-                    hmrcCategories
+            {categoryInput === "search" ? (
+              <Label>
+                {form.is_business ? "Business category" : "Personal category"}
+              </Label>
+            ) : null}
+            {categoryInput === "search" ? (
+              <p className="text-xs text-muted-foreground">
+                {form.is_business
+                  ? "Options for tax and self assessment — different from personal spending."
+                  : FLOW_COPY.categoryHint}
+              </p>
+            ) : null}
+            {categoryInput === "dropdown" ? (
+              <CategoryChoiceSelect
+                id={`${idPrefix}-category`}
+                label={
+                  form.is_business ? "Business category" : "Personal category"
+                }
+                hint={
+                  form.is_business
+                    ? "Options for tax and self assessment — different from personal spending."
+                    : FLOW_COPY.categoryHint
+                }
+                choices={categoryChoices}
+                value={choiceId}
+                disabled={disabled}
+                onChange={(id) => {
+                  if (!id) return;
+                  onChange(
+                    applyChoiceToForm(
+                      form,
+                      id,
+                      purpose,
+                      categories,
+                      hmrcCategories
+                    )
+                  );
+                }}
+              />
+            ) : (
+              <SearchableChoiceButtons
+                key={`${idPrefix}-${purpose}-${form.direction}`}
+                choices={categoryChoices}
+                selectedId={choiceId}
+                disabled={disabled}
+                searchPlaceholder={
+                  form.is_business
+                    ? "Search business category…"
+                    : "Search category…"
+                }
+                onSelect={(id) =>
+                  onChange(
+                    applyChoiceToForm(
+                      form,
+                      id as CategoryChoiceId,
+                      purpose,
+                      categories,
+                      hmrcCategories
+                    )
                   )
-                )
-              }
-            />
+                }
+              />
+            )}
           </div>
 
           {form.is_business ? (

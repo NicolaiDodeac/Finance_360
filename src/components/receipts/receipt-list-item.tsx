@@ -1,5 +1,5 @@
 import { Badge } from "@/components/ui/badge";
-import { ReceiptFileIcon } from "@/components/receipts/receipt-file-icon";
+import { ReceiptProofPreview } from "@/components/receipts/receipt-proof-preview";
 import {
   formatMoney,
   formatTransactionDate,
@@ -27,7 +27,11 @@ export function ReceiptListItem({
 
   const statusBadge =
     badge ??
-    (attached ? "Linked" : (receipt as { status?: string }).status === "needs_review" ? "Needs review" : "Unmatched");
+    (attached
+      ? "Linked"
+      : (receipt as { status?: string }).status === "needs_review"
+        ? "Needs review"
+        : "Unmatched");
 
   const handleClick = () => {
     if (onClick) onClick();
@@ -35,13 +39,18 @@ export function ReceiptListItem({
   };
 
   return (
-    <button
-      type="button"
-      onClick={handleClick}
-      className="flex w-full gap-3 rounded-xl border border-border bg-card px-4 py-3 text-left transition-colors hover:bg-muted/40"
-    >
-      <ReceiptFileIcon mimeType={receipt.mime_type} />
-      <div className="min-w-0 flex-1 space-y-1">
+    <div className="flex w-full items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 transition-colors hover:bg-muted/40">
+      <ReceiptProofPreview
+        receiptId={receipt.id}
+        mimeType={receipt.mime_type}
+        label={displayName}
+        lazy
+      />
+      <button
+        type="button"
+        onClick={handleClick}
+        className="min-w-0 flex-1 space-y-1 text-left"
+      >
         <div className="flex flex-wrap items-center gap-2">
           <p className="truncate font-medium text-foreground">{displayName}</p>
           <Badge
@@ -71,7 +80,7 @@ export function ReceiptListItem({
             : "Not linked to a transaction yet"}
           {receipt.notes ? ` · ${receipt.notes}` : ""}
         </p>
-      </div>
-    </button>
+      </button>
+    </div>
   );
 }

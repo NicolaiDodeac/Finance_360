@@ -21,6 +21,8 @@ export interface UseSpeechRecognitionResult {
   error: string | null;
   startListening: () => void;
   stopListening: () => void;
+  /** Stop and wait until the engine is ready for a new session (Say again). */
+  restartListening: () => void;
   resetTranscript: () => void;
 }
 
@@ -32,7 +34,29 @@ export function useSpeechRecognition(): UseSpeechRecognitionResult {
 
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stopWaitersRef = useRef<Set<() => void>>(new Set());
   const isSupported = isSpeechRecognitionSupported();
+
+  const notifyStopSettled = useCallback(() => {
+    for (const resolve of stopWaitersRef.current) {
+      resolve();
+    }
+    stopWaitersRef.current.clear();
+  }, []);
+
+  const waitForStopSettled = useCallback(() => {
+    if (!recognitionRef.current) {
+      return Promise.resolve();
+    }
+    return new Promise<void>((resolve) => {
+      stopWaitersRef.current.add(resolve);
+      window.setTimeout(() => {
+        if (stopWaitersRef.current.delete(resolve)) {
+          resolve();
+        }
+      }, 400);
+    });
+  }, []);
 
   const clearSilenceTimer = useCallback(() => {
     if (silenceTimerRef.current) {
@@ -45,11 +69,8 @@ export function useSpeechRecognition(): UseSpeechRecognitionResult {
     clearSilenceTimer();
     const recognition = recognitionRef.current;
     if (recognition) {
+      // Keep handlers attached — clearing onend before stop() breaks stop() in Chrome.
       try {
-        recognition.onend = null;
-        recognition.onerror = null;
-        recognition.onresult = null;
-        recognition.onspeechend = null;
         recognition.stop();
       } catch {
         try {
@@ -58,12 +79,14 @@ export function useSpeechRecognition(): UseSpeechRecognitionResult {
           /* ignore */
         }
       }
-      recognitionRef.current = null;
     }
     setIsListening(false);
     setInterimTranscript("");
     vibrateSpeechFeedback(8);
-  }, [clearSilenceTimer]);
+    if (!recognition) {
+      notifyStopSettled();
+    }
+  }, [clearSilenceTimer, notifyStopSettled]);
 
   const resetTranscript = useCallback(() => {
     setTranscript("");
@@ -122,10 +145,13 @@ export function useSpeechRecognition(): UseSpeechRecognitionResult {
       };
 
       recognition.onend = () => {
+        if (recognitionRef.current === recognition) {
+          recognitionRef.current = null;
+        }
         setIsListening(false);
         setInterimTranscript("");
-        recognitionRef.current = null;
         clearSilenceTimer();
+        notifyStopSettled();
       };
 
       recognition.onspeechend = scheduleSilenceStop;
@@ -138,10 +164,11 @@ export function useSpeechRecognition(): UseSpeechRecognitionResult {
         return true;
       } catch {
         recognitionRef.current = null;
+        notifyStopSettled();
         return false;
       }
     },
-    [clearSilenceTimer, stopListening]
+    [clearSilenceTimer, notifyStopSettled, stopListening]
   );
 
   const startListening = useCallback(() => {
@@ -160,6 +187,44 @@ export function useSpeechRecognition(): UseSpeechRecognitionResult {
     setIsListening(false);
   }, [beginRecognition, isSupported, stopListening]);
 
+  const restartListening = useCallback(() => {
+    if (!isSupported) {
+      setError(unsupportedSpeechMessage());
+      return;
+    }
+
+    stopListening();
+    setError(null);
+
+    void (async () => {
+      await waitForStopSettled();
+
+      const tryStart = (attempt: number) => {
+        if (recognitionRef.current) {
+          if (attempt < 6) {
+            window.setTimeout(() => tryStart(attempt + 1), 80);
+          }
+          return;
+        }
+        const started = beginRecognition();
+        if (started) return;
+        if (attempt < 4) {
+          window.setTimeout(() => tryStart(attempt + 1), 120);
+          return;
+        }
+        setError("Could not start voice input. Tap Say again to retry.");
+        setIsListening(false);
+      };
+
+      tryStart(0);
+    })();
+  }, [
+    beginRecognition,
+    isSupported,
+    stopListening,
+    waitForStopSettled,
+  ]);
+
   useEffect(() => () => stopListening(), [stopListening]);
 
   return {
@@ -170,6 +235,7 @@ export function useSpeechRecognition(): UseSpeechRecognitionResult {
     error,
     startListening,
     stopListening,
+    restartListening,
     resetTranscript,
   };
 }

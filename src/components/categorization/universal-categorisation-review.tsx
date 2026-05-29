@@ -12,7 +12,9 @@ export interface UniversalCategorisationReviewProps {
   confirmLabel?: string;
   disabled?: boolean;
   isPending?: boolean;
-  /** Expanded change flow (purpose picker, category choices, etc.) */
+  /** Shown on the summary step (e.g. personal/business + category) before “Change details”. */
+  summaryPanel?: React.ReactNode;
+  /** Expanded change flow (usually merchant, date, amount). */
   changePanel?: React.ReactNode;
   /** Advanced accounting fields (HMRC, VAT, tax year, notes, raw OCR) */
   advancedPanel?: React.ReactNode;
@@ -21,6 +23,8 @@ export interface UniversalCategorisationReviewProps {
   footerNote?: string;
   /** Show category / purpose controls immediately (edit flows). */
   alwaysShowChange?: boolean;
+  /** Parent provides confirm (e.g. drawer footer). */
+  hideConfirmButton?: boolean;
 }
 
 export function UniversalCategorisationReview({
@@ -29,11 +33,13 @@ export function UniversalCategorisationReview({
   confirmLabel = "Confirm",
   disabled,
   isPending,
+  summaryPanel,
   changePanel,
   advancedPanel,
   rememberPanel,
   footerNote = "You can change this anytime.",
   alwaysShowChange = false,
+  hideConfirmButton = false,
 }: UniversalCategorisationReviewProps) {
   const [showChange, setShowChange] = useState(alwaysShowChange);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -43,29 +49,43 @@ export function UniversalCategorisationReview({
   if (compactMode && !showChange && !alwaysShowChange) {
     return (
       <div className="space-y-4">
-        <CompactSummary
-          detected={detected}
-          suggested={suggested}
-          usuallyNote={suggested.usuallyNote}
-        />
+        {summaryPanel ? (
+          <div className="space-y-3">{summaryPanel}</div>
+        ) : (
+          <CompactSummary
+            detected={detected}
+            suggested={suggested}
+            usuallyNote={suggested.usuallyNote}
+          />
+        )}
+        {summaryPanel ? (
+          <CompactSuggestion
+            suggested={suggested}
+            usuallyNote={suggested.usuallyNote}
+          />
+        ) : null}
         {rememberPanel}
-        <Button
-          type="button"
-          className="h-14 w-full text-base"
-          disabled={disabled || isPending}
-          onClick={onConfirm}
-        >
-          {isPending ? "Saving…" : confirmLabel}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          className="h-11 w-full"
-          disabled={disabled || isPending}
-          onClick={() => setShowChange(true)}
-        >
-          Change details
-        </Button>
+        {!hideConfirmButton ? (
+          <Button
+            type="button"
+            className="h-14 w-full text-base"
+            disabled={disabled || isPending}
+            onClick={onConfirm}
+          >
+            {isPending ? "Saving…" : confirmLabel}
+          </Button>
+        ) : null}
+        {changePanel ? (
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11 w-full"
+            disabled={disabled || isPending}
+            onClick={() => setShowChange(true)}
+          >
+            Change details
+          </Button>
+        ) : null}
         <p className="text-center text-xs text-muted-foreground">{footerNote}</p>
       </div>
     );
@@ -162,6 +182,31 @@ export function UniversalCategorisationReview({
       </div>
 
       <p className="text-center text-xs text-muted-foreground">{footerNote}</p>
+    </div>
+  );
+}
+
+function CompactSuggestion({
+  suggested,
+  usuallyNote,
+}: {
+  suggested: CategorisationReviewContext["suggested"];
+  usuallyNote?: string | null;
+}) {
+  return (
+    <div className="space-y-1 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
+      <p className="text-base font-medium text-foreground">
+        {suggested.categoryLabel}
+      </p>
+      <p className="text-sm text-muted-foreground">
+        {suggested.businessPersonalLabel}
+      </p>
+      {usuallyNote ? (
+        <p className="text-xs text-muted-foreground">{usuallyNote}</p>
+      ) : null}
+      {suggested.taxNote ? (
+        <p className="text-xs text-muted-foreground">{suggested.taxNote}</p>
+      ) : null}
     </div>
   );
 }

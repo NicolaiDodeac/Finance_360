@@ -2,9 +2,9 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ExternalLink, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { ReceiptAttachPanel } from "@/components/receipts/receipt-attach-panel";
-import { ReceiptFileIcon } from "@/components/receipts/receipt-file-icon";
+import { ReceiptProofPreview } from "@/components/receipts/receipt-proof-preview";
 import { TransactionCategoryFields } from "@/components/transactions/transaction-category-fields";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,7 +24,6 @@ import type { CategoryRow } from "@/lib/categories/queries";
 import {
   deleteReceipt,
   detachReceiptFromTransaction,
-  getReceiptPreviewUrl,
   saveReceiptVault,
 } from "@/lib/receipts/actions";
 import {
@@ -58,14 +57,12 @@ export function ReceiptDetailDrawer({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [linkedForm, setLinkedForm] = useState<TransactionFormInput | null>(
     null
   );
 
   useEffect(() => {
     if (!receipt) {
-      setPreviewUrl(null);
       setLinkedForm(null);
       return;
     }
@@ -75,21 +72,6 @@ export function ReceiptDetailDrawer({
     } else {
       setLinkedForm(null);
     }
-
-    let cancelled = false;
-    getReceiptPreviewUrl(receipt.id)
-      .then((result) => {
-        if (!cancelled && result.success && result.data) {
-          setPreviewUrl(result.data.url);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setPreviewUrl(null);
-      });
-
-    return () => {
-      cancelled = true;
-    };
   }, [receipt]);
 
   function handleSave(e: React.FormEvent<HTMLFormElement>) {
@@ -202,24 +184,24 @@ export function ReceiptDetailDrawer({
               ) : null}
 
               <div className="flex items-center gap-3">
-                <ReceiptFileIcon mimeType={receipt.mime_type} />
+                <ReceiptProofPreview
+                  receiptId={receipt.id}
+                  mimeType={receipt.mime_type}
+                  label={
+                    receipt.merchant_name ??
+                    receipt.original_filename ??
+                    "Receipt"
+                  }
+                />
                 <div className="min-w-0 flex-1 text-sm">
                   <p className="truncate font-medium">
-                    {receipt.original_filename ?? "File"}
+                    {receipt.merchant_name ??
+                      receipt.original_filename ??
+                      "Receipt"}
                   </p>
-                  {previewUrl ? (
-                    <a
-                      href={previewUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-primary hover:underline"
-                    >
-                      Open file
-                      <ExternalLink className="h-3.5 w-3.5" />
-                    </a>
-                  ) : (
-                    <p className="text-muted-foreground">Loading preview…</p>
-                  )}
+                  <p className="text-xs text-muted-foreground">
+                    {formatFileSize(receipt.file_size_bytes)} · Tap to view
+                  </p>
                 </div>
               </div>
 

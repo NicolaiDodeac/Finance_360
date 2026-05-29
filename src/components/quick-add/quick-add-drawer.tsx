@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Calendar, Zap } from "lucide-react";
+import { Calendar, Mic, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Drawer,
@@ -15,6 +15,10 @@ import {
 } from "@/components/ui/drawer";
 import { QuickAddDraftCard } from "@/components/quick-add/quick-add-draft-card";
 import { QuickAddVoiceInput } from "@/components/quick-add/quick-add-voice-input";
+import {
+  QuickAddVoiceMode,
+  type VoiceCapturePhase,
+} from "@/components/quick-add/quick-add-voice-mode";
 import { saveQuickAddDrafts } from "@/lib/quick-add/actions";
 import {
   parseQuickAddText,
@@ -25,6 +29,7 @@ import type { QuickAddDraft, QuickAddSaveDraftInput } from "@/lib/quick-add/type
 import type { CategoryRow } from "@/lib/categories/queries";
 import type { HmrcCategoryRow } from "@/lib/hmrc/queries";
 import { formatShortDate } from "@/lib/transactions/format";
+import { cn } from "@/lib/utils";
 
 interface QuickAddDrawerProps {
   open: boolean;
@@ -32,8 +37,10 @@ interface QuickAddDrawerProps {
   categories: CategoryRow[];
   hmrcCategories: HmrcCategoryRow[];
   dateContext?: QuickAddDateContext | null;
-  /** Start the microphone immediately when opened (voice quick-capture). */
+  /** @deprecated Prefer `mode="voice"`. */
   autoStartVoice?: boolean;
+  /** Text typing vs voice-first capture from the global capture sheet. */
+  mode?: "text" | "voice";
 }
 
 type Step = "input" | "review";
@@ -56,6 +63,7 @@ function draftToSaveInput(draft: QuickAddDraft): QuickAddSaveDraftInput {
     exclude_from_income: draft.excludeFromIncome,
     exclude_from_spending: draft.excludeFromSpending,
     original_segment: draft.originalSegment,
+    payment_method: draft.payment_method,
   };
 }
 
@@ -66,8 +74,11 @@ export function QuickAddDrawer({
   hmrcCategories,
   dateContext,
   autoStartVoice,
+  mode: modeProp,
 }: QuickAddDrawerProps) {
   const router = useRouter();
+  const mode = modeProp ?? (autoStartVoice ? "voice" : "text");
+  const isVoiceMode = mode === "voice";
   const [isPending, startTransition] = useTransition();
   const [step, setStep] = useState<Step>("input");
   const [text, setText] = useState("");
@@ -75,6 +86,7 @@ export function QuickAddDrawer({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [parseNotice, setParseNotice] = useState<string | null>(null);
+  const [voicePhase, setVoicePhase] = useState<VoiceCapturePhase>("recording");
   const [draftDefaultDate, setDraftDefaultDate] = useState(
     () => dateContext?.defaultDate ?? new Date().toISOString().slice(0, 10)
   );
@@ -88,7 +100,13 @@ export function QuickAddDrawer({
   }, [open, dateContext?.defaultDate]);
 
   const hasValidDrafts = useMemo(
-    () => drafts.length > 0 && drafts.every((d) => d.amount > 0),
+    () =>
+      drafts.length > 0 &&
+      drafts.every(
+        (d) =>
+          d.amount > 0 &&
+          (d.direction !== "expense" || Boolean(d.payment_method))
+      ),
     [drafts]
   );
 
@@ -103,6 +121,7 @@ export function QuickAddDrawer({
     setEditingId(null);
     setError(null);
     setParseNotice(null);
+    setVoicePhase("recording");
     setDraftDefaultDate(
       dateContext?.defaultDate ?? new Date().toISOString().slice(0, 10)
     );
@@ -117,14 +136,16 @@ export function QuickAddDrawer({
     setText(value);
   }
 
-  function handleCreateDrafts() {
+  function handleCreateDrafts(fromText?: string) {
     setError(null);
     setParseNotice(null);
-    const trimmed = text.trim();
+    const trimmed = (fromText ?? text).trim();
     if (!trimmed) {
       setError("Describe what you spent or type an amount and merchant.");
       return;
     }
+
+    setText(trimmed);
 
     const segments = parseQuickAddText(trimmed);
     if (segments.length === 0) {
@@ -181,17 +202,40 @@ export function QuickAddDrawer({
       <DrawerContent>
         <DrawerHeader>
           <DrawerTitle className="flex items-center gap-2">
-            <Zap className="h-5 w-5 text-primary" />
-            Quick Add
+            {isVoiceMode ? (
+              <>
+                <Mic className="h-5 w-5 text-red-600" />
+                Voice add
+              </>
+            ) : (
+              <>
+                <Zap className="h-5 w-5 text-primary" />
+                Quick Add
+              </>
+            )}
           </DrawerTitle>
-          <DrawerDescription>
-            Quick Add is for cash spending, small corrections, or things your bank
-            statement does not explain well.
+          <DrawerDescription
+            className={cn(
+              isVoiceMode &&
+                step === "input" &&
+                voicePhase === "recording" &&
+                "sr-only"
+            )}
+          >
+            {isVoiceMode
+              ? voicePhase === "recording"
+                ? "Recording. Say amount and what it was for, then stop when you are done."
+                : voicePhase === "result" || voicePhase === "edit"
+                  ? "Check what we heard, then continue."
+                  : step === "review"
+                    ? "Check the details, choose personal or business, then confirm below."
+                    : "Speak naturally — we show what we heard when you stop, then you confirm."
+              : "Quick Add is for cash spending, small corrections, or things your bank statement does not explain well."}
           </DrawerDescription>
         </DrawerHeader>
 
         <DrawerBody className="space-y-4">
-          {dateContext?.helperLabel ? (
+          {dateContext?.helperLabel && !(step === "input" && isVoiceMode) ? (
             <p className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-sm font-medium text-foreground">
               <Calendar className="h-4 w-4 shrink-0 text-primary" />
               {dateContext.helperLabel}
@@ -205,6 +249,16 @@ export function QuickAddDrawer({
           ) : null}
 
           {step === "input" ? (
+            isVoiceMode ? (
+              <QuickAddVoiceMode
+                key={open ? "voice-open" : "voice-closed"}
+                autoStart={open}
+                disabled={isPending}
+                onPhaseChange={setVoicePhase}
+                onConfirm={(heard) => handleCreateDrafts(heard)}
+                onCancel={() => handleOpenChange(false)}
+              />
+            ) : (
             <>
               <p className="text-sm text-muted-foreground">
                 Your bank import remains the main record. Quick Add helps fill the
@@ -243,15 +297,17 @@ export function QuickAddDrawer({
                 text={text}
                 onTextChange={handleTextChange}
                 disabled={isPending}
-                autoStart={autoStartVoice && open}
               />
             </>
+            )
           ) : (
             <>
-              <p className="text-sm text-muted-foreground">
-                Review drafts before they are saved to your Manual Account. Nothing
-                is saved until you confirm.
-              </p>
+              {!isVoiceMode ? (
+                <p className="text-sm text-muted-foreground">
+                  Review drafts before they are saved to your Manual Account.
+                  Nothing is saved until you confirm.
+                </p>
+              ) : null}
               {parseNotice ? (
                 <p className="text-sm text-amber-800 dark:text-amber-200">
                   {parseNotice}
@@ -273,7 +329,8 @@ export function QuickAddDrawer({
                       dateMax={dateContext?.maxDate}
                       editing={editingId === draft.id}
                       disabled={isPending}
-                      onEdit={() => setEditingId(draft.id)}
+                      showBusinessPurpose
+                      hideInlineConfirm={isVoiceMode}
                       onDiscard={() =>
                         setDrafts((prev) => prev.filter((d) => d.id !== draft.id))
                       }
@@ -295,39 +352,46 @@ export function QuickAddDrawer({
                 onClick={() => {
                   setStep("input");
                   setEditingId(null);
+                  setVoicePhase("recording");
                 }}
               >
-                Back to edit text
+                {isVoiceMode ? "Record again" : "Back to edit text"}
               </Button>
             </>
           )}
         </DrawerBody>
 
         <DrawerFooter>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={isPending}
-            onClick={() => handleOpenChange(false)}
-          >
-            Cancel
-          </Button>
-          {step === "input" ? (
-            <Button
-              type="button"
-              disabled={isPending || !text.trim()}
-              onClick={handleCreateDrafts}
-            >
-              Create drafts
-            </Button>
-          ) : (
-            <Button
-              type="button"
-              disabled={isPending || !hasValidDrafts || drafts.length === 0}
-              onClick={handleConfirmAll}
-            >
-              {isPending ? "Saving…" : `Confirm ${drafts.length} draft${drafts.length === 1 ? "" : "s"}`}
-            </Button>
+          {step === "input" && isVoiceMode ? null : (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isPending}
+                onClick={() => handleOpenChange(false)}
+              >
+                Cancel
+              </Button>
+              {step === "input" ? (
+                <Button
+                  type="button"
+                  disabled={isPending || !text.trim()}
+                  onClick={() => handleCreateDrafts()}
+                >
+                  Create drafts
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  disabled={isPending || !hasValidDrafts || drafts.length === 0}
+                  onClick={handleConfirmAll}
+                >
+                  {isPending
+                    ? "Saving…"
+                    : `Confirm ${drafts.length} draft${drafts.length === 1 ? "" : "s"}`}
+                </Button>
+              )}
+            </>
           )}
         </DrawerFooter>
       </DrawerContent>

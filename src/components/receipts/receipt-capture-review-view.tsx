@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Pencil, Search } from "lucide-react";
@@ -17,8 +17,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { getCategoryChoices } from "@/lib/categorization/categorise-flow/mappings";
-import type { CategoryChoiceId } from "@/lib/categorization/categorise-flow/types";
+import {
+  receiptCaptureFormToMetadataFormData,
+  type ReceiptCaptureFormState,
+} from "@/lib/receipts/capture-form";
 import {
   ReceiptDeleteButton,
   confirmDeleteReceipt,
@@ -29,10 +31,7 @@ import {
   updateReceiptMetadata,
 } from "@/lib/receipts/actions";
 import { createTransactionFromReceipt } from "@/lib/receipts/capture-actions";
-import {
-  classifyReceiptText,
-  type ReceiptPurpose,
-} from "@/lib/receipts/classify";
+import { classifyReceiptText } from "@/lib/receipts/classify";
 import {
   formatMoney,
   formatTransactionDate,
@@ -77,21 +76,31 @@ export function ReceiptCaptureReviewView({
   const [editing, setEditing] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [showIncome, setShowIncome] = useState(false);
-  const [purpose, setPurposeState] = useState<ReceiptPurpose>(
-    review.creationSuggestion.purposeDefault
-  );
-  const [payment, setPayment] = useState<ReceiptPaymentMethod | null>(
-    receipt.payment_method
-  );
-  // null = use the detected/suggested category; otherwise a user override.
-  const [categoryChoiceId, setCategoryChoiceId] =
-    useState<CategoryChoiceId | null>(null);
+  const [captureForm, setCaptureForm] = useState<ReceiptCaptureFormState>(() => ({
+    merchant_name: receipt.merchant_name ?? "",
+    receipt_date: receipt.receipt_date ?? "",
+    total_amount:
+      receipt.total_amount !== null ? Number(receipt.total_amount) : null,
+    payment_method: receipt.payment_method,
+    purpose: review.creationSuggestion.purposeDefault,
+    categoryChoiceId: null,
+  }));
 
-  // Changing the purpose invalidates a category chosen for the old purpose.
-  function setPurpose(next: ReceiptPurpose) {
-    setPurposeState(next);
-    setCategoryChoiceId(null);
-  }
+  useEffect(() => {
+    setCaptureForm((prev) => ({
+      ...prev,
+      merchant_name: receipt.merchant_name ?? "",
+      receipt_date: receipt.receipt_date ?? "",
+      total_amount:
+        receipt.total_amount !== null ? Number(receipt.total_amount) : null,
+      payment_method: receipt.payment_method,
+    }));
+  }, [
+    receipt.merchant_name,
+    receipt.receipt_date,
+    receipt.total_amount,
+    receipt.payment_method,
+  ]);
 
   const showBusinessPurpose = showsBusinessFeatures(financeMode);
   const hasBankMatch = Boolean(suggestedMatch);
@@ -100,33 +109,27 @@ export function ReceiptCaptureReviewView({
     () =>
       buildReceiptCreationSuggestion({
         financeMode,
-        merchant: receipt.merchant_name,
+        merchant: captureForm.merchant_name || receipt.merchant_name,
         rawText: extraction.rawText,
-        paymentMethod: payment,
-        purpose,
-        categoryChoiceId,
+        paymentMethod: captureForm.payment_method,
+        purpose: captureForm.purpose,
+        categoryChoiceId: captureForm.categoryChoiceId,
         categories,
         hmrcCategories,
       }),
     [
       financeMode,
+      captureForm,
       receipt.merchant_name,
       extraction.rawText,
-      payment,
-      purpose,
-      categoryChoiceId,
       categories,
       hmrcCategories,
     ]
   );
 
-  const categoryOptions = useMemo(
-    () => getCategoryChoices(purpose === "business" ? "business" : "personal", "expense"),
-    [purpose]
-  );
-
   const needsPayment =
-    review.showPaymentPrompt && (!payment || payment === "unknown");
+    review.showPaymentPrompt &&
+    (!captureForm.payment_method || captureForm.payment_method === "unknown");
 
   const mayBeIncome = useMemo(
     () =>
@@ -139,7 +142,7 @@ export function ReceiptCaptureReviewView({
     startTransition(async () => {
       const result = await createTransactionFromReceipt(receipt.id, {
         purpose: kind === "business_income" ? "business" : "personal",
-        payment_method: payment,
+        payment_method: captureForm.payment_method,
         record_as_income: true,
         income_kind: kind,
       });
@@ -185,13 +188,31 @@ export function ReceiptCaptureReviewView({
     });
   }
 
+  async function persistCaptureDetails(): Promise<boolean> {
+    const formData = receiptCaptureFormToMetadataFormData(
+      captureForm,
+      receipt.tax_year_id,
+      receipt.notes ?? ""
+    );
+    const result = await updateReceiptMetadata(receipt.id, formData);
+    if (!result.success) {
+      setError(result.error ?? "Could not save receipt details.");
+      return false;
+    }
+    router.refresh();
+    return true;
+  }
+
   function handleCreateAndLink() {
     setError(null);
     startTransition(async () => {
+      const saved = await persistCaptureDetails();
+      if (!saved) return;
+
       const result = await createTransactionFromReceipt(receipt.id, {
-        purpose,
-        payment_method: payment,
-        category_choice_id: categoryChoiceId,
+        purpose: captureForm.purpose,
+        payment_method: captureForm.payment_method,
+        category_choice_id: captureForm.categoryChoiceId,
       });
       if (!result.success) {
         setError(result.error ?? "Could not save.");
@@ -262,9 +283,11 @@ export function ReceiptCaptureReviewView({
   }
 
   const amountLabel =
-    receipt.total_amount !== null
-      ? formatMoney(Number(receipt.total_amount))
-      : "Amount needed";
+    captureForm.total_amount !== null && captureForm.total_amount > 0
+      ? formatMoney(captureForm.total_amount)
+      : receipt.total_amount !== null
+        ? formatMoney(Number(receipt.total_amount))
+        : "Amount needed";
 
   return (
     <div className="mx-auto max-w-lg space-y-5 pb-8">
@@ -288,28 +311,30 @@ export function ReceiptCaptureReviewView({
         </p>
       ) : null}
 
-      <div className="space-y-3">
+      <div className="space-y-2">
         <p className="text-xs font-medium text-muted-foreground">
           We found these details
         </p>
-        <ReceiptProofPreview
-          receiptId={receipt.id}
-          mimeType={receipt.mime_type}
-          label={receipt.merchant_name ?? receipt.original_filename ?? "Receipt"}
-        />
         <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
+          <ReceiptProofPreview
+            receiptId={receipt.id}
+            mimeType={receipt.mime_type}
+            label={
+              receipt.merchant_name ?? receipt.original_filename ?? "Receipt"
+            }
+          />
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium">
-              {receipt.merchant_name ?? receipt.original_filename ?? "Receipt"}
+              {captureForm.merchant_name ||
+                receipt.merchant_name ||
+                receipt.original_filename ||
+                "Receipt"}
             </p>
             <p className="text-xs text-muted-foreground">
               {amountLabel}
-              {receipt.receipt_date
-                ? ` · ${formatTransactionDate(receipt.receipt_date)}`
+              {(captureForm.receipt_date || receipt.receipt_date)
+                ? ` · ${formatTransactionDate(captureForm.receipt_date || receipt.receipt_date!)}`
                 : ""}
-            </p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Tap the photo above to check the receipt
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-1">
@@ -380,10 +405,13 @@ export function ReceiptCaptureReviewView({
             <Select
               id="payment_method_select"
               name="payment_method"
-              value={payment ?? ""}
+              value={captureForm.payment_method ?? ""}
               disabled={isPending}
               onChange={(e) =>
-                setPayment((e.target.value || null) as ReceiptPaymentMethod | null)
+                setCaptureForm((prev) => ({
+                  ...prev,
+                  payment_method: (e.target.value || null) as ReceiptPaymentMethod | null,
+                }))
               }
             >
               <option value="">Not sure</option>
@@ -402,73 +430,6 @@ export function ReceiptCaptureReviewView({
             Save details
           </Button>
         </form>
-      ) : null}
-
-      {showBusinessPurpose ? (
-        <section className="space-y-3 rounded-xl border border-border bg-card p-4">
-          <p className="text-sm font-medium">Personal or business?</p>
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              type="button"
-              variant={purpose === "personal" ? "default" : "outline"}
-              className="h-12"
-              disabled={isPending}
-              onClick={() => setPurpose("personal")}
-            >
-              Personal
-            </Button>
-            <Button
-              type="button"
-              variant={purpose === "business" ? "default" : "outline"}
-              className="h-12"
-              disabled={isPending}
-              onClick={() => setPurpose("business")}
-            >
-              Business
-            </Button>
-          </div>
-          <button
-            type="button"
-            disabled={isPending}
-            onClick={() => setPurpose("not_sure")}
-            className={
-              purpose === "not_sure"
-                ? "text-xs font-medium text-foreground underline underline-offset-2"
-                : "text-xs text-muted-foreground underline-offset-2 hover:underline"
-            }
-          >
-            Not sure yet
-          </button>
-          <p className="text-xs text-muted-foreground">
-            We preset the category to match — change it under “Change details”.
-          </p>
-        </section>
-      ) : null}
-
-      {needsPayment ? (
-        <section className="space-y-3 rounded-xl border border-border bg-card p-4">
-          <p className="text-sm font-medium">How did you pay?</p>
-          <div className="grid grid-cols-3 gap-2">
-            {(
-              [
-                { value: "cash" as const, label: "Cash" },
-                { value: "card" as const, label: "Card" },
-                { value: "unknown" as const, label: "Other" },
-              ] as const
-            ).map((opt) => (
-              <Button
-                key={opt.value}
-                type="button"
-                variant={payment === opt.value ? "default" : "outline"}
-                className="h-12"
-                disabled={isPending}
-                onClick={() => setPayment(opt.value)}
-              >
-                {opt.label}
-              </Button>
-            ))}
-          </div>
-        </section>
       ) : null}
 
       {hasBankMatch ? (
@@ -534,75 +495,23 @@ export function ReceiptCaptureReviewView({
           ) : null}
 
           <ReceiptCategorisationReview
-            merchant={receipt.merchant_name}
-            amount={
-              receipt.total_amount !== null
-                ? Number(receipt.total_amount)
-                : null
-            }
-            receiptDate={receipt.receipt_date}
+            captureForm={captureForm}
+            onCaptureFormChange={setCaptureForm}
             paymentLabel={suggestion.paymentLabel}
-            purpose={purpose}
             suggestion={suggestion}
             categories={categories}
             hmrcCategories={hmrcCategories}
+            showBusinessPurpose={showBusinessPurpose}
+            showPaymentField={needsPayment}
             disabled={
               isPending ||
               needsPayment ||
-              receipt.total_amount === null ||
-              !receipt.receipt_date
+              captureForm.total_amount === null ||
+              captureForm.total_amount <= 0 ||
+              !captureForm.receipt_date
             }
             isPending={isPending}
             onConfirm={handleCreateAndLink}
-            purposePanel={
-              <div className="space-y-4">
-                {showBusinessPurpose ? (
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button
-                      type="button"
-                      variant={purpose === "personal" ? "default" : "outline"}
-                      className="h-11"
-                      disabled={isPending}
-                      onClick={() => setPurpose("personal")}
-                    >
-                      Personal
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={purpose === "business" ? "default" : "outline"}
-                      className="h-11"
-                      disabled={isPending}
-                      onClick={() => setPurpose("business")}
-                    >
-                      Business
-                    </Button>
-                  </div>
-                ) : null}
-                {purpose !== "not_sure" && categoryOptions.length > 0 ? (
-                  <div className="space-y-2">
-                    <Label htmlFor="category-choice" className="text-xs">
-                      Category
-                    </Label>
-                    <Select
-                      id="category-choice"
-                      value={suggestion.categoryChoiceId ?? ""}
-                      disabled={isPending}
-                      onChange={(e) =>
-                        setCategoryChoiceId(
-                          (e.target.value || null) as CategoryChoiceId | null
-                        )
-                      }
-                    >
-                      {categoryOptions.map((opt) => (
-                        <option key={opt.id} value={opt.id}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </Select>
-                  </div>
-                ) : null}
-              </div>
-            }
           />
           <Button
             type="button"
