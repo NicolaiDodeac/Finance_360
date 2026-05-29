@@ -57,7 +57,7 @@ function collectCategoryKeys(expenses: TransactionWithRelations[]): Map<
     if (!map.has(key)) {
       map.set(key, {
         categoryId: tx.category_id,
-        categoryName: tx.category?.name ?? "Uncategorized",
+        categoryName: tx.category?.name ?? "Needs a category",
       });
     }
   }

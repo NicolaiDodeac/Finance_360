@@ -48,7 +48,7 @@ export function directionLabel(direction: TransactionDirection): string {
     case "income":
       return "Income";
     case "expense":
-      return "Expense";
+      return "Spending";
     case "transfer":
       return "Transfer";
   }

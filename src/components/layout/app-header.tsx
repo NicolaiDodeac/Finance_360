@@ -1,12 +1,13 @@
 "use client";
 
-import { LogOut } from "lucide-react";
+import { LogOut, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { SpaceSwitcher } from "@/components/spaces/space-switcher";
+import { useCapture } from "@/components/capture/capture-provider";
 import { financeModeLabel } from "@/lib/profile/types";
 import type { FinanceMode } from "@/lib/profile/types";
 import type { UserSpace } from "@/lib/spaces/types";
@@ -25,6 +26,7 @@ export function AppHeader({
   activeSpaceId,
 }: AppHeaderProps) {
   const router = useRouter();
+  const { openCapture } = useCapture();
   const initials = userEmail
     ? userEmail.slice(0, 2).toUpperCase()
     : "U";
@@ -49,6 +51,15 @@ export function AppHeader({
         <div className="hidden lg:block" />
       )}
       <div className="flex items-center gap-3">
+        <Button
+          type="button"
+          size="sm"
+          onClick={openCapture}
+          className="hidden lg:inline-flex"
+        >
+          <Plus className="h-4 w-4" />
+          Capture
+        </Button>
         <div className="hidden text-right sm:block">
           <p className="text-sm font-medium text-foreground">
             {userEmail ?? "Account"}

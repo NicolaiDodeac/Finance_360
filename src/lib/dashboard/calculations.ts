@@ -78,7 +78,7 @@ function buildCategorySpending(
   for (const tx of expenses) {
     if (!shouldCountInLifestyleSpending(tx)) continue;
     const key = tx.category_id ?? "__uncategorized__";
-    const categoryName = tx.category?.name ?? "Uncategorized";
+    const categoryName = tx.category?.name ?? "Needs a category";
     const existing = map.get(key);
     const amount = Number(tx.amount);
 
@@ -328,7 +328,7 @@ function buildAttentionItems(
   if (personal.uncategorizedCount > 0) {
     items.push({
       id: "uncategorized",
-      title: "Uncategorized transactions",
+      title: "Transactions that need a category",
       description: "Add categories so spending insights stay accurate.",
       count: personal.uncategorizedCount,
       href: buildTransactionsFilterLink(
@@ -373,7 +373,7 @@ function buildAttentionItems(
         id: "evidence-review",
         title: "Business evidence to review",
         description:
-          "Some business expenses could use a receipt or short note for your records.",
+          "Some business costs could use a receipt or short note for your records.",
         count: evidenceCount,
         href: `/transactions?scope=business&taxYear=${taxYearId}`,
       });
@@ -381,8 +381,8 @@ function buildAttentionItems(
     if (business.uncategorizedBusinessExpenses > 0 && taxYearId) {
       items.push({
         id: "business-uncategorized",
-        title: "Uncategorized business expenses",
-        description: "Assign HMRC categories for allowable costs.",
+        title: "Business costs that need a category",
+        description: "Assign tax categories for allowable costs.",
         count: business.uncategorizedBusinessExpenses,
         href: `/transactions?scope=business&taxYear=${taxYearId}`,
       });

@@ -14,12 +14,12 @@ const SECTIONS = [
     body: `${INCOME_FLOW_COPY.hint} No personal-or-business step for money in.`,
   },
   {
-    title: "Expenses — what was it for?",
+    title: "Spending — what was it for?",
     body: `${FLOW_COPY.expensePurposeHint} Then pick a category that fits.`,
   },
   {
     title: "Review and confirm",
-    body: "See a plain-English summary before applying. Change the tax category on business expenses only if you need to.",
+    body: "See a plain-English summary before applying. Change the tax category on business costs only if you need to.",
   },
   {
     title: "Not sure is okay",

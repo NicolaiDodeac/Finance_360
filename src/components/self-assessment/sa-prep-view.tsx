@@ -1,5 +1,3 @@
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import { SaCopySummaryPanel } from "@/components/self-assessment/sa-copy-summary";
 import { SaEvidenceExplainer } from "@/components/self-assessment/sa-evidence-explainer";
 import { SaExpensesSection } from "@/components/self-assessment/sa-expenses-section";
@@ -22,7 +20,6 @@ export function SaPrepView({ data, loadError }: SaPrepViewProps) {
   if (!selectedTaxYear) {
     return (
       <div className="space-y-6">
-        <BackToTaxHub />
         <SaPrepIntro />
         <TaxHubEmptyNoTaxYears />
       </div>
@@ -31,8 +28,6 @@ export function SaPrepView({ data, loadError }: SaPrepViewProps) {
 
   return (
     <div className="space-y-6">
-      <BackToTaxHub />
-
       <SaPrepIntro />
 
       {loadError ? (
@@ -67,17 +62,5 @@ export function SaPrepView({ data, loadError }: SaPrepViewProps) {
         </>
       ) : null}
     </div>
-  );
-}
-
-function BackToTaxHub() {
-  return (
-    <Link
-      href="/tax"
-      className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-    >
-      <ArrowLeft className="h-4 w-4" />
-      Back to Tax Hub
-    </Link>
   );
 }

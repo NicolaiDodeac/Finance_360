@@ -98,7 +98,7 @@ export function TransactionCategorisationReview({
     ? buildSuggestedFromResolved(resolved, purpose, null)
     : {
         purposeLabel: purpose === "business" ? "Business" : "Personal",
-        categoryLabel: category?.name ?? "Uncategorised",
+        categoryLabel: category?.name ?? "Needs a category",
         businessPersonalLabel: form.is_business ? "Business" : "Personal",
         hmrcLabel: hmrc?.name ?? null,
         taxNote: form.is_business && hmrc ? "Tax category on file." : null,

@@ -307,7 +307,7 @@ export function DashboardView({ data, taxYearId }: DashboardViewProps) {
           <CardHeader>
             <CardTitle className="text-base">Recurring payments</CardTitle>
             <CardDescription>
-              Regular personal expenses detected from your transactions
+              Regular personal spending detected from your transactions
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

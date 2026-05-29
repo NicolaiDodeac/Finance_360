@@ -138,7 +138,7 @@ function buildReviewItems(
   if (uncategorizedExpenses.length > 0) {
     items.push({
       id: "uncategorized-business-expenses",
-      title: "Uncategorized business expenses",
+      title: "Business expenses that need a category",
       description:
         "Add a category so your spending is easier to review and group.",
       count: uncategorizedExpenses.length,
@@ -205,7 +205,7 @@ function buildReviewItems(
   if (uncategorizedIncome.length > 0) {
     items.push({
       id: "uncategorized-income",
-      title: "Uncategorized business income",
+      title: "Business income that needs a category",
       description: "Label income sources so your turnover is easy to verify.",
       count: uncategorizedIncome.length,
       href: buildTransactionsLink({

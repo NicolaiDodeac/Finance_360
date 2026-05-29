@@ -1,9 +1,6 @@
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { CategorisationExplainerPanel } from "@/components/categorization/categorisation-explainer-panel";
 import { CategoriseAssistantView } from "@/components/categorization/categorise-assistant-view";
-import { Button } from "@/components/ui/button";
 import { requireAuth } from "@/lib/auth/helpers";
 import { getCategories } from "@/lib/categories/queries";
 import { ensureDefaultCategories } from "@/lib/setup/categories";
@@ -42,15 +39,9 @@ export default async function CategoriseTransactionsPage() {
 
   return (
     <>
-      <div className="mb-4">
-        <Button type="button" variant="ghost" size="sm" asChild>
-          <Link href="/transactions">
-            <ArrowLeft className="h-4 w-4" />
-            Back to transactions
-          </Link>
-        </Button>
-      </div>
       <PageHeader
+        backHref="/transactions"
+        backLabel="Back to transactions"
         title="What were these for?"
         description="Answer a few quick questions about your income and spending. Finance 360 sorts out the categories and tax behind the scenes — you review before anything is saved."
       />

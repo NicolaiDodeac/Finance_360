@@ -40,7 +40,7 @@ interface QuickAddDraftCardProps {
 }
 
 const directions: { value: TransactionDirection; label: string }[] = [
-  { value: "expense", label: "Expense" },
+  { value: "expense", label: "Spending" },
   { value: "income", label: "Income" },
   { value: "transfer", label: "Transfer" },
 ];

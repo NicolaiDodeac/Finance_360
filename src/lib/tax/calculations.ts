@@ -115,7 +115,7 @@ function buildReviewItems(
   if (uncategorized.length > 0) {
     items.push({
       id: "uncategorized-expenses",
-      title: "Uncategorized business expenses",
+      title: "Business expenses that need a category",
       description:
         "Add an HMRC expense category so allowable costs are tracked correctly.",
       count: uncategorized.length,

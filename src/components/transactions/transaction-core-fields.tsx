@@ -17,7 +17,7 @@ interface TransactionCoreFieldsProps {
 
 const directions: { value: TransactionDirection; label: string }[] = [
   { value: "income", label: "Income" },
-  { value: "expense", label: "Expense" },
+  { value: "expense", label: "Spending" },
   { value: "transfer", label: "Transfer" },
 ];
 
