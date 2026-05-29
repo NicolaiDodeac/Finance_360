@@ -85,6 +85,7 @@ export function resolveQuickAddDrafts(
       excludeFromSpending,
       confidence: segment.confidence,
       reviewRecommended: segment.reviewRecommended || amount <= 0,
+      payment_method: segment.paymentMethod,
     };
   });
 }

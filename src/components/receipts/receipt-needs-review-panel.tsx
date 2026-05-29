@@ -145,18 +145,22 @@ export function ReceiptNeedsReviewPanel({ receipt }: ReceiptNeedsReviewPanelProp
         </p>
       ) : null}
 
-      <ReceiptProofPreview
-        receiptId={receipt.id}
-        mimeType={receipt.mime_type}
-        label={formMerchant || receipt.original_filename || "Receipt"}
-      />
-      <p className="text-center text-xs text-muted-foreground">
-        Tap the photo to check details while you fill in the form
-      </p>
+      <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
+        <ReceiptProofPreview
+          receiptId={receipt.id}
+          mimeType={receipt.mime_type}
+          label={formMerchant || receipt.original_filename || "Receipt"}
+        />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">
+            {formMerchant || receipt.original_filename || "Receipt"}
+          </p>
+          <p className="text-xs text-muted-foreground">Incomplete scan</p>
+        </div>
+      </div>
 
       {editing ? (
         <form
-          key={`${formMerchant}-${formDate}-${formTotal}`}
           onSubmit={handleMetadataSubmit}
           className="space-y-3 rounded-xl border border-border bg-card p-4"
         >

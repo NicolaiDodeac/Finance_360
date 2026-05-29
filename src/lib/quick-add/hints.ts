@@ -1,13 +1,17 @@
 import type { CategoryChoiceId } from "@/lib/categorization/categorise-flow/types";
 import type { CategorisePurpose } from "@/lib/categorization/categorise-flow/types";
 import type { FlowType } from "@/lib/transactions/flow-type";
-import type { TransactionDirection } from "@/types/database";
+import type {
+  ReceiptPaymentMethod,
+  TransactionDirection,
+} from "@/types/database";
 
 export interface HintMatch {
   categoryChoiceId: CategoryChoiceId | null;
   purpose: CategorisePurpose | null;
   flowTypeOverride: FlowType | null;
   direction: TransactionDirection | null;
+  paymentMethod?: ReceiptPaymentMethod | null;
 }
 
 /** Longer phrases first so “debt repayment” wins over “repayment”. */
@@ -120,6 +124,36 @@ const HINT_PHRASES: Array<{ pattern: RegExp; hint: HintMatch }> = [
       direction: "expense",
     },
   },
+  {
+    pattern: /\b(contactless|tap\s+to\s+pay|apple\s+pay|google\s+pay)\b/i,
+    hint: {
+      categoryChoiceId: null,
+      purpose: null,
+      flowTypeOverride: null,
+      direction: "expense",
+      paymentMethod: "contactless",
+    },
+  },
+  {
+    pattern: /\b(debit\s+card|credit\s+card|by\s+card|on\s+card|card\s+payment|paid\s+by\s+card)\b/i,
+    hint: {
+      categoryChoiceId: null,
+      purpose: null,
+      flowTypeOverride: null,
+      direction: "expense",
+      paymentMethod: "card",
+    },
+  },
+  {
+    pattern: /\b(paid\s+)?cash\b|\bin\s+cash\b|\bby\s+cash\b/i,
+    hint: {
+      categoryChoiceId: null,
+      purpose: null,
+      flowTypeOverride: null,
+      direction: "expense",
+      paymentMethod: "cash",
+    },
+  },
 ];
 
 const STRIP_WORDS = new Set(
@@ -143,6 +177,11 @@ const STRIP_WORDS = new Set(
     "takeaway",
     "business",
     "personal",
+    "cash",
+    "card",
+    "contactless",
+    "paid",
+    "pay",
     "savings",
     "saving",
     "repayment",
@@ -161,6 +200,7 @@ export function matchHints(text: string): HintMatch {
     purpose: null,
     flowTypeOverride: null,
     direction: null,
+    paymentMethod: null,
   };
 
   for (const { pattern, hint } of HINT_PHRASES) {
@@ -169,6 +209,11 @@ export function matchHints(text: string): HintMatch {
     if (hint.purpose) merged.purpose = hint.purpose;
     if (hint.flowTypeOverride) merged.flowTypeOverride = hint.flowTypeOverride;
     if (hint.direction) merged.direction = hint.direction;
+    if (hint.paymentMethod) merged.paymentMethod = hint.paymentMethod;
+  }
+
+  if (!merged.paymentMethod && /\bcard\b/i.test(text) && !/\bcredit\s+card\s+repayment\b/i.test(text)) {
+    merged.paymentMethod = "card";
   }
 
   if (/\bsubscription\b/i.test(text) && !merged.categoryChoiceId) {
@@ -193,6 +238,12 @@ export function stripForMerchant(text: string): string {
     s = s.replace(pattern, " ");
   }
   s = s.replace(/\bsubscription\b/gi, " ");
+  s = s.replace(
+    /\b(contactless|debit\s+card|credit\s+card|apple\s+pay|google\s+pay|tap\s+to\s+pay|paid\s+by|by\s+card|on\s+card|in\s+cash|by\s+cash|card\s+payment)\b/gi,
+    " "
+  );
+  s = s.replace(/\b(paid\s+)?cash\b/gi, " ");
+  s = s.replace(/\bcard\b/gi, " ");
 
   return s
     .split(/\s+/)

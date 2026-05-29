@@ -12,6 +12,7 @@ import { getCategorizationRules } from "@/lib/categorization/queries";
 import { collectMatchedRuleIds } from "@/lib/categorization/apply-batch";
 import { draftToAssistantPatch } from "@/lib/quick-add/resolve-draft";
 import type { QuickAddSaveInput } from "@/lib/quick-add/types";
+import { accountIdForPayment } from "@/lib/accounts/payment-account";
 import { ensureDefaultAccount } from "@/lib/accounts/queries";
 import { getHmrcCategories } from "@/lib/hmrc/queries";
 import { requireAuth } from "@/lib/auth/helpers";
@@ -56,8 +57,8 @@ export async function saveQuickAddDrafts(
     getHmrcCategories(),
   ]);
 
-  const accountId = findManualAccountId(accounts);
-  if (!accountId) {
+  const defaultAccountId = findManualAccountId(accounts);
+  if (!defaultAccountId) {
     return { success: false, error: "No account available. Try again shortly." };
   }
 
@@ -65,6 +66,10 @@ export async function saveQuickAddDrafts(
   const ruleMatches: Array<{ matched_rule_id: string | null }> = [];
 
   const payloads = input.drafts.map((draft) => {
+    const accountId = accountIdForPayment(
+      draft.payment_method ?? null,
+      accounts
+    ) || defaultAccountId;
     const applied = applyCategorizationRules(
       {
         description: draft.description.trim() || null,
@@ -112,6 +117,7 @@ export async function saveQuickAddDrafts(
         excludeFromSpending: draft.exclude_from_spending,
         confidence: draft.review_recommended ? "review_recommended" : "high",
         reviewRecommended: draft.review_recommended,
+        payment_method: draft.payment_method ?? null,
       }),
       review_recommended: draft.review_recommended,
       flow_type: draft.flow_type ?? undefined,

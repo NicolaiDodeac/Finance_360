@@ -1,17 +1,12 @@
 "use client";
 
 import { useMemo } from "react";
-import { Pencil, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
+import { CategorisationEditPanel } from "@/components/categorization/categorisation-edit-panel";
 import { UniversalCategorisationReview } from "@/components/categorization/universal-categorisation-review";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import type { CategoryRow } from "@/lib/categories/queries";
-import {
-  getCategoryOptionLabel,
-  getSelectableCategories,
-} from "@/lib/categories/display";
+import { Label } from "@/components/ui/label";
 import {
   buildDetectedFields,
   buildSuggestedFromResolved,
@@ -19,8 +14,14 @@ import {
 import { buildReviewContext } from "@/lib/categorization/review-confidence";
 import { resolveCategoryChoice } from "@/lib/categorization/categorise-flow/resolve";
 import { resolvePurposeNotSure } from "@/lib/categorization/categorise-flow/resolve";
+import type { CategoryChoiceId } from "@/lib/categorization/categorise-flow/types";
+import {
+  quickAddDraftToTransactionForm,
+  transactionFormToQuickAddDraft,
+} from "@/lib/quick-add/draft-form";
 import type { HmrcCategoryRow } from "@/lib/hmrc/queries";
 import type { QuickAddDraft } from "@/lib/quick-add/types";
+import type { CategoryRow } from "@/lib/categories/queries";
 import { formatMoney } from "@/lib/transactions/format";
 import type { TransactionDirection } from "@/types/database";
 
@@ -33,7 +34,10 @@ interface QuickAddDraftCardProps {
   dateMax?: string;
   editing: boolean;
   disabled?: boolean;
-  onEdit: () => void;
+  /** Personal / business toggles (expense drafts). */
+  showBusinessPurpose?: boolean;
+  /** Footer handles confirm (e.g. voice add). */
+  hideInlineConfirm?: boolean;
   onDiscard: () => void;
   onChange: (draft: QuickAddDraft) => void;
   onDoneEdit: () => void;
@@ -54,7 +58,8 @@ export function QuickAddDraftCard({
   dateMax,
   editing,
   disabled,
-  onEdit,
+  showBusinessPurpose = true,
+  hideInlineConfirm = false,
   onDiscard,
   onChange,
   onDoneEdit,
@@ -76,7 +81,7 @@ export function QuickAddDraftCard({
     null
   );
 
-  const context = buildReviewContext({
+  const baseContext = buildReviewContext({
     detected: buildDetectedFields({
       merchant: draft.merchant_name,
       amount: formatMoney(draft.amount, currency),
@@ -101,6 +106,57 @@ export function QuickAddDraftCard({
     merchantKnown: Boolean(draft.merchant_name),
   });
 
+  const context = { ...baseContext, compactMode: true };
+
+  const transactionForm = useMemo(
+    () => quickAddDraftToTransactionForm(draft),
+    [draft]
+  );
+
+  const expenseWithBusiness =
+    showBusinessPurpose && draft.direction === "expense";
+
+  const panelProps = {
+    details: {
+      merchant: draft.merchant_name,
+      transactionDate: draft.transaction_date,
+      amount: draft.amount > 0 ? draft.amount : null,
+      paymentMethod: draft.payment_method,
+    },
+    onDetailsChange: (details: {
+      merchant: string;
+      transactionDate: string;
+      amount: number | null;
+      paymentMethod?: typeof draft.payment_method;
+    }) =>
+      onChange({
+        ...draft,
+        merchant_name: details.merchant,
+        description: details.merchant,
+        transaction_date: details.transactionDate,
+        amount: details.amount ?? 0,
+        payment_method: details.paymentMethod ?? draft.payment_method,
+      }),
+    showPaymentPicker: draft.direction === "expense",
+    categoryForm: transactionForm,
+    onCategoryFormChange: (form: typeof transactionForm) =>
+      onChange(transactionFormToQuickAddDraft(form, draft, categories, hmrcCategories)),
+    categories,
+    hmrcCategories,
+    showBusinessPurpose: expenseWithBusiness,
+    disabled,
+    idPrefix: `draft-${draft.id}`,
+    dateMin,
+    dateMax,
+    personalCategoryChoiceId: draft.categoryChoiceId,
+    onPersonalCategoryChange: (id: CategoryChoiceId) =>
+      onChange({
+        ...draft,
+        purpose: "personal",
+        categoryChoiceId: id,
+      }),
+  };
+
   if (editing) {
     return (
       <div className="rounded-xl border border-primary/30 bg-card p-4 space-y-4">
@@ -118,96 +174,30 @@ export function QuickAddDraftCard({
           </Button>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label htmlFor={`date-${draft.id}`}>Date</Label>
-            <Input
-              id={`date-${draft.id}`}
-              type="date"
-              value={draft.transaction_date}
-              min={dateMin}
-              max={dateMax}
-              disabled={disabled}
-              onChange={(e) =>
-                onChange({ ...draft, transaction_date: e.target.value })
-              }
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor={`dir-${draft.id}`}>Direction</Label>
-            <Select
-              id={`dir-${draft.id}`}
-              value={draft.direction}
-              disabled={disabled}
-              onChange={(e) =>
-                onChange({
-                  ...draft,
-                  direction: e.target.value as TransactionDirection,
-                })
-              }
-            >
-              {directions.map((d) => (
-                <option key={d.value} value={d.value}>
-                  {d.label}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label htmlFor={`merchant-${draft.id}`}>Merchant / description</Label>
-            <Input
-              id={`merchant-${draft.id}`}
-              value={draft.merchant_name}
-              disabled={disabled}
-              onChange={(e) =>
-                onChange({
-                  ...draft,
-                  merchant_name: e.target.value,
-                  description: e.target.value,
-                })
-              }
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor={`amount-${draft.id}`}>Amount</Label>
-            <Input
-              id={`amount-${draft.id}`}
-              type="number"
-              min={0}
-              step="0.01"
-              value={draft.amount || ""}
-              disabled={disabled}
-              onChange={(e) =>
-                onChange({
-                  ...draft,
-                  amount: Number.parseFloat(e.target.value) || 0,
-                })
-              }
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor={`cat-${draft.id}`}>Category</Label>
-            <Select
-              id={`cat-${draft.id}`}
-              value={draft.categoryId ?? ""}
-              disabled={disabled}
-              onChange={(e) => {
-                const cat = categories.find((c) => c.id === e.target.value);
-                onChange({
-                  ...draft,
-                  categoryId: e.target.value || null,
-                  categoryName: cat?.name ?? null,
-                });
-              }}
-            >
-              <option value="">Suggested / none</option>
-              {getSelectableCategories(categories).map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {getCategoryOptionLabel(cat, categories)}
-                </option>
-              ))}
-            </Select>
-          </div>
+        <CategorisationEditPanel
+          {...panelProps}
+          mode="all"
+        />
+
+        <div className="space-y-1.5">
+          <Label htmlFor={`dir-${draft.id}`}>Direction</Label>
+          <Select
+            id={`dir-${draft.id}`}
+            value={draft.direction}
+            disabled={disabled}
+            onChange={(e) =>
+              onChange({
+                ...draft,
+                direction: e.target.value as TransactionDirection,
+              })
+            }
+          >
+            {directions.map((d) => (
+              <option key={d.value} value={d.value}>
+                {d.label}
+              </option>
+            ))}
+          </Select>
         </div>
 
         <Button type="button" size="sm" disabled={disabled} onClick={onDoneEdit}>
@@ -224,18 +214,14 @@ export function QuickAddDraftCard({
         onConfirm={onDoneEdit}
         confirmLabel="Looks good"
         disabled={disabled}
-        changePanel={
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={disabled}
-            onClick={onEdit}
-          >
-            <Pencil className="h-4 w-4" />
-            Edit fields
-          </Button>
+        hideConfirmButton={hideInlineConfirm}
+        summaryPanel={
+          <CategorisationEditPanel
+            {...panelProps}
+            mode={draft.direction === "expense" ? "all" : "details"}
+          />
         }
+        footerNote="You can change this anytime."
       />
       <Button
         type="button"

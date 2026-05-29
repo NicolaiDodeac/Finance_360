@@ -1,6 +1,9 @@
 import type { CategorisePurpose, CategoryChoiceId } from "@/lib/categorization/categorise-flow/types";
 import type { FlowType } from "@/lib/transactions/flow-type";
-import type { TransactionDirection } from "@/types/database";
+import type {
+  ReceiptPaymentMethod,
+  TransactionDirection,
+} from "@/types/database";
 
 export type QuickAddConfidence = "high" | "review_recommended";
 
@@ -15,6 +18,7 @@ export interface QuickAddParsedSegment {
   flowTypeOverride: FlowType | null;
   confidence: QuickAddConfidence;
   reviewRecommended: boolean;
+  paymentMethod: ReceiptPaymentMethod | null;
 }
 
 /** Draft ready for review UI and save payload. */
@@ -40,6 +44,7 @@ export interface QuickAddDraft {
   excludeFromSpending: boolean;
   confidence: QuickAddConfidence;
   reviewRecommended: boolean;
+  payment_method: ReceiptPaymentMethod | null;
 }
 
 export interface QuickAddSaveDraftInput {
@@ -59,6 +64,7 @@ export interface QuickAddSaveDraftInput {
   exclude_from_income: boolean;
   exclude_from_spending: boolean;
   original_segment: string;
+  payment_method?: ReceiptPaymentMethod | null;
 }
 
 export interface QuickAddSaveInput {

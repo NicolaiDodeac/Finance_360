@@ -144,7 +144,7 @@ export function CaptureProvider({
         }}
         categories={categories}
         hmrcCategories={hmrcCategories}
-        autoStartVoice={quickAddMode === "voice"}
+        mode={quickAddMode === "voice" ? "voice" : "text"}
       />
     </CaptureContext.Provider>
   );

@@ -118,6 +118,7 @@ function parseOneSegment(segment: string): QuickAddParsedSegment {
     flowTypeOverride: hints.flowTypeOverride,
     confidence,
     reviewRecommended,
+    paymentMethod: hints.paymentMethod ?? null,
   };
 }
 
